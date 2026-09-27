@@ -4,6 +4,7 @@ import MapView from "@arcgis/core/views/MapView";
 import SceneView from "@arcgis/core/views/SceneView";
 import Graphic from "@arcgis/core/Graphic";
 import Point from "@arcgis/core/geometry/Point";
+import Polygon from "@arcgis/core/geometry/Polygon";
 import FeatureLayer from "@arcgis/core/layers/FeatureLayer";
 import GraphicsLayer from "@arcgis/core/layers/GraphicsLayer";
 import GroupLayer from "@arcgis/core/layers/GroupLayer";
@@ -19,6 +20,9 @@ import {
   DEFAULT_SUN_HOUR,
   ACTIVE_PIN_COLOR,
   BUILDING_COLOR,
+  CONTEXT_BUILDING_COLOR,
+  CONTEXT_BUILDING_HEIGHT_FT,
+  FEET_TO_METERS,
   GEOCODER_URL,
   layers,
   MAP_CENTER,
@@ -34,6 +38,8 @@ import {
 import {
   buildingFootprint,
   buildingHeightMeters,
+  fetchBuildingFootprints,
+  findFootprintAtPoint,
   imageryForYear,
   larimerCountyExtent,
   pinSymbol,
@@ -69,6 +75,8 @@ export const MapViewPanel = ({ activeLayers, selected, saved, buildingInfo, onSe
   const viewRef = useRef<AnyView | null>(null);
   const savedLayerRef = useRef<GraphicsLayer | null>(null);
   const buildingLayerRef = useRef<GraphicsLayer | null>(null);
+  const contextBuildingLayerRef = useRef<GraphicsLayer | null>(null);
+  const nearbyFootprintsRef = useRef<Polygon[]>([]);
   const layerRefs = useRef(new Map<string, FeatureLayer | GroupLayer>());
   const onSelectRef = useRef(onSelect);
   onSelectRef.current = onSelect;
@@ -97,6 +105,12 @@ export const MapViewPanel = ({ activeLayers, selected, saved, buildingInfo, onSe
     map.add(savedLayer);
     savedLayerRef.current = savedLayer;
     if (shadowsEnabled) {
+      const contextBuildingLayer = new GraphicsLayer({
+        title: "Nearby buildings (shadow context)",
+        elevationInfo: { mode: "relative-to-ground" },
+      });
+      map.add(contextBuildingLayer);
+      contextBuildingLayerRef.current = contextBuildingLayer;
       const buildingLayer = new GraphicsLayer({
         title: "Building footprint (estimated)",
         elevationInfo: { mode: "relative-to-ground" },
@@ -104,7 +118,9 @@ export const MapViewPanel = ({ activeLayers, selected, saved, buildingInfo, onSe
       map.add(buildingLayer);
       buildingLayerRef.current = buildingLayer;
     } else {
+      contextBuildingLayerRef.current = null;
       buildingLayerRef.current = null;
+      nearbyFootprintsRef.current = [];
     }
     const search = new Search({
       view,
@@ -144,9 +160,62 @@ export const MapViewPanel = ({ activeLayers, selected, saved, buildingInfo, onSe
       imageryLayerRefs.current.clear();
       savedLayerRef.current = null;
       buildingLayerRef.current = null;
+      contextBuildingLayerRef.current = null;
+      nearbyFootprintsRef.current = [];
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [shadowsEnabled]);
+
+  useEffect(() => {
+    const view = viewRef.current;
+    const layer = contextBuildingLayerRef.current;
+    if (!shadowsEnabled || !(view instanceof SceneView) || !layer) {
+      return;
+    }
+    let cancelled = false;
+    const loadFootprints = () => {
+      void fetchBuildingFootprints(view.extent)
+        .then((footprints) => {
+          if (cancelled || contextBuildingLayerRef.current !== layer) {
+            return;
+          }
+          nearbyFootprintsRef.current = footprints;
+          layer.removeAll();
+          footprints.forEach((geometry) => {
+            layer.add(
+              new Graphic({
+                geometry,
+                symbol: new PolygonSymbol3D({
+                  symbolLayers: [
+                    new ExtrudeSymbol3DLayer({
+                      size: CONTEXT_BUILDING_HEIGHT_FT * FEET_TO_METERS,
+                      castShadows: true,
+                      material: { color: CONTEXT_BUILDING_COLOR },
+                    }),
+                  ],
+                }),
+              }),
+            );
+          });
+        })
+        .catch((error: unknown) => console.error("Unable to load building footprints", error));
+    };
+    if (view.stationary) {
+      loadFootprints();
+    }
+    const handle = reactiveUtils.watch(
+      () => view.stationary,
+      (stationary) => {
+        if (stationary) {
+          loadFootprints();
+        }
+      },
+    );
+    return () => {
+      cancelled = true;
+      handle.remove();
+    };
+  }, [shadowsEnabled, viewVersion]);
 
   useEffect(() => {
     const view = viewRef.current;
@@ -167,8 +236,11 @@ export const MapViewPanel = ({ activeLayers, selected, saved, buildingInfo, onSe
     if (!selected || !buildingInfo) {
       return;
     }
-    // Footprint area = total finished sf spread across stories; use a rectangular approximation for a cuboid.
-    const footprint = buildingFootprint(selected, buildingInfo);
+    // Prefer the real parcel footprint from GIS data when the selected point falls inside one; otherwise fall
+    // back to a rectangular approximation derived from assessor square footage and stories.
+    const selectedPoint = new Point({ longitude: selected.longitude, latitude: selected.latitude });
+    const footprint =
+      findFootprintAtPoint(nearbyFootprintsRef.current, selectedPoint) ?? buildingFootprint(selected, buildingInfo);
     const heightMeters = buildingHeightMeters(buildingInfo);
     layer.add(
       new Graphic({
@@ -492,7 +564,8 @@ export const MapViewPanel = ({ activeLayers, selected, saved, buildingInfo, onSe
         )}
       </div>
       <div className="map-note">
-        Estimated building shadow from assessor stories · select a result to inspect the property
+        Shadows use real Larimer County building footprints where available (est. height elsewhere) · select a
+        result to inspect the property
       </div>
     </div>
   );

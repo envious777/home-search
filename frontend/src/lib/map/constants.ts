@@ -46,6 +46,14 @@ export const FEET_TO_METERS = 0.3048;
 export const FOOTPRINT_ASPECT_RATIO = 1.5;
 export const FEET_PER_DEGREE_LATITUDE = 364_000;
 
+// Larimer County building footprints (real parcel geometry), used to improve shadow accuracy over the rectangle estimate.
+export const BUILDING_FOOTPRINTS_WFS_URL = "https://geo.colorado.edu/geoserver/geocolorado/wfs";
+export const BUILDING_FOOTPRINTS_TYPE_NAME = "geocolorado:larimer_county_buildings";
+export const BUILDING_FOOTPRINTS_FETCH_LIMIT = 1000;
+// Neighboring footprints only cast shadows; their real height is unknown so a modest default is used.
+export const CONTEXT_BUILDING_HEIGHT_FT = 15;
+export const CONTEXT_BUILDING_COLOR = [130, 130, 130, 0.35];
+
 export const layers: LayerDefinition[] = [
   {
     id: "fema",
