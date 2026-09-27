@@ -1,5 +1,116 @@
 # Home Search
 
+Home Search is a Larimer County property exploration tool. It combines an ArcGIS map with public geographic layers and county assessor/treasurer records so a user can search for an address, inspect its surroundings, and review the property's public facts in one workspace.
+
+## What it does
+
+- Searches geocoded addresses within the Larimer County extent.
+- Shows street or satellite basemaps and lets users toggle FEMA floodplain, Fort Collins floodplain, bikeway, and flood-warning layers.
+- Displays layer legends and ArcGIS popups for feature attributes. The flood-warning layer also shows the latest available stream and rain-gage readings.
+- Saves selected locations in browser `localStorage` for quick return visits.
+- Loads assessor and treasurer data for a selected address, with partial results when an individual upstream section is unavailable.
+- Supports light and dark themes, persisted in browser `localStorage`.
+- Provides optional 3D sun shadows. The selected building is represented by an estimated extrusion based on assessor square footage and story count; it is not a surveyed building footprint.
+- Provides a historical imagery timelapse from 1999 through 2025. If an exact year is not published, the nearest earlier Larimer County imagery service is shown.
+
+## Architecture
+
+The repository is an npm workspace with two independently buildable applications:
+
+| Package    | Role                                                                                                                                |
+| ---------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `frontend` | React 19 + Vite UI, Fluent UI controls, and ArcGIS Maps SDK for JavaScript map experience                                           |
+| `api`      | Node.js Azure Functions v4 HTTP endpoint that normalizes the request, looks up the county account, and aggregates assessor sections |
+
+In local development, Vite serves the frontend and proxies `/api` requests to the Azure Functions host at `http://127.0.0.1:7071`. The frontend uses public ArcGIS and Larimer County services directly for map, geocoding, imagery, and operational layers.
+
+## Local development
+
+### Prerequisites
+
+- Node.js with npm
+- Azure Functions Core Tools v4
+- Docker, only if the local Azurite storage emulator is not already running
+
+Install dependencies from the repository root:
+
+```sh
+npm install
+```
+
+Start the local storage emulator when needed:
+
+```sh
+docker compose up -d
+```
+
+Run the API and frontend in separate terminals:
+
+```sh
+cd api
+func start
+```
+
+```sh
+npm run dev --workspace frontend
+```
+
+Open the Vite URL shown in the terminal, normally `http://127.0.0.1:5173/`. The frontend proxy sends assessor requests to the Functions host; no frontend API URL configuration is required for local development.
+
+The API's local defaults are in [api/local.settings.json](api/local.settings.json). `TAX_YEAR` controls the treasurer tax-district request and defaults to `2025` when the setting is absent:
+
+```json
+{
+  "Values": {
+    "FUNCTIONS_WORKER_RUNTIME": "node",
+    "AzureWebJobsStorage": "UseDevelopmentStorage=true",
+    "STORAGE_CONNECTION_STRING": "UseDevelopmentStorage=true",
+    "TAX_YEAR": "2025"
+  }
+}
+```
+
+`local.settings.json` is for local execution. Configure equivalent application settings in the deployed Function App rather than committing credentials or environment-specific values.
+
+## Verification
+
+Run the complete workspace checks from the repository root:
+
+```sh
+npm run typecheck
+npm test
+npm run build
+```
+
+Formatting is checked with:
+
+```sh
+npm run format:check
+```
+
+The frontend tests cover browser storage behavior, while the API tests cover assessor endpoint and aggregation behavior. Tests that call public county or ArcGIS services may also depend on network availability when run outside the mocked test paths.
+
+## Search and map workflow
+
+1. Use the map's top-right search box to search for an address. The geocoder is restricted to the Larimer County extent.
+2. Select a result to center the map, place an active pin, and request the assessor analysis.
+3. Use the right-hand panels to toggle operational layers, inspect legends, and manage saved locations.
+4. Switch between Streets and Satellite basemaps. Enable **Sun Shadows (3D)** to inspect an estimated building mass and adjust the sun time.
+5. Enable **Imagery Timelapse** to choose a historical year or play the available imagery sequence. Changing the year pauses playback.
+6. Review the full-width assessor analysis below the map. Use **View table** inside a section when the raw upstream records are needed.
+
+Saved locations are browser-local and are not synchronized between browsers or devices. Selecting a saved location runs the assessor lookup again so the displayed records remain fresh.
+
+## External services and data boundaries
+
+The app depends on the following public services:
+
+- ArcGIS World Geocoding Service for address suggestions.
+- ArcGIS feature and map services for FEMA floodplain, Fort Collins floodplain, bikeways, flood warnings, and historical imagery.
+- Larimer County assessor and treasurer APIs for property records.
+
+These services can change, rate-limit requests, or be temporarily unavailable. Map layers fail independently and assessor sections use partial-result handling. The app does not provide legal, surveying, tax, flood-risk, or valuation advice; county records and map visualizations should be independently verified.
+
 ## Assessor analysis
 
 Selecting a geocoded address on the map loads Larimer County assessor and treasurer records for that property and renders them in the full-width **Assessor analysis** section below the map.
@@ -21,7 +132,7 @@ sequenceDiagram
   UI->>UI: AssessorSections renders each section
 ```
 
-1. **Address normalization** — [frontend/src/App.tsx](frontend/src/App.tsx) (`toAddressQuery`) splits the canonical address into a house number and a bare street name. Directionals (`N`, `SW`, …) and suffixes (`Dr`, `Ave`, …) are stripped because the Larimer search only matches bare street names. City is fixed to `FORT COLLINS`.
+1. **Address normalization** — [frontend/src/App.tsx](frontend/src/App.tsx) (`toAddressQuery`) splits the canonical address into a house number and a bare street name. Directionals (`N`, `SW`, …) and suffixes (`Dr`, `Ave`, …) are stripped because the Larimer search only matches bare street names. The city returned by the geocoder is passed through to the county search.
 2. **Account lookup** — [api/src/assessor/client.ts](api/src/assessor/client.ts) calls the property search and extracts the first `accountno`.
 3. **Section fan-out** — all sections are fetched in parallel with `Promise.allSettled`, each with an 8 s timeout. A failing section does not fail the request.
 
