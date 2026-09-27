@@ -1,0 +1,20 @@
+{
+  "name": "fort-collins-home-search",
+  "private": true,
+  "workspaces": [
+    "frontend",
+    "api"
+  ],
+  "scripts": {
+    "install:all": "npm install",
+    "build": "npm run build --workspace frontend && npm run build --workspace api",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "lint": "prettier --check .",
+    "typecheck": "npm run typecheck --workspace frontend && npm run typecheck --workspace api",
+    "test": "npm run test --workspace frontend && npm run test --workspace api"
+  },
+  "devDependencies": {
+    "prettier": "^3.6.2"
+  }
+}

@@ -1,0 +1,6 @@
+node_modules/
+dist/
+coverage/
+__blobstorage__/
+__queuestorage__/
+__azurite_db_*.json
