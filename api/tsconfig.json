@@ -11,6 +11,6 @@
     "rootDir": ".",
     "types": ["node"]
   },
-  "include": ["src", "AssessorAnalysis", "Health"],
+  "include": ["src", "AssessorAnalysis", "Health", "BuildingFootprints"],
   "exclude": ["src/**/*.test.ts"]
 }

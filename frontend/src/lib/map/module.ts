@@ -7,9 +7,7 @@ import PointSymbol3D from "@arcgis/core/symbols/PointSymbol3D";
 import type { BuildingInfo, SelectedLocation } from "../../types";
 import {
   AVG_STORY_HEIGHT_FT,
-  BUILDING_FOOTPRINTS_FETCH_LIMIT,
-  BUILDING_FOOTPRINTS_TYPE_NAME,
-  BUILDING_FOOTPRINTS_WFS_URL,
+  BUILDING_FOOTPRINTS_API_URL,
   FEET_PER_DEGREE_LATITUDE,
   FEET_TO_METERS,
   FOOTPRINT_ASPECT_RATIO,
@@ -19,6 +17,7 @@ import {
   LARIMER_COUNTY_BOUNDS,
   MAP_PIN_OUTLINE,
   MAP_PIN_PATH,
+  SUN_DATES,
 } from "./constants";
 
 export const larimerCountyExtent = new Extent({
@@ -29,6 +28,16 @@ export const larimerCountyExtent = new Extent({
 export const imageryForYear = (year: number): { year: number; url: string } => {
   const imageryYear = [...imageryYears].reverse().find((candidate) => candidate <= year) ?? imageryYears[0];
   return { year: imageryYear, url: `${IMAGERY_ROOT}/${IMAGERY_SERVICES_BY_YEAR[imageryYear]}/MapServer` };
+}
+
+export const sunDate = (sunDateId: string, hour: number): Date => {
+  const option = SUN_DATES.find((candidate) => candidate.id === sunDateId);
+  const date = new Date();
+  if (option?.month !== undefined && option.day !== undefined) {
+    date.setMonth(option.month, option.day);
+  }
+  date.setHours(hour, 0, 0, 0);
+  return date;
 }
 
 const pinImage = (color: string): string => {
@@ -93,18 +102,13 @@ export const geojsonToPolygon = (geometry: GeoJsonPolygonGeometry): Polygon => {
 }
 
 export const fetchBuildingFootprints = async (extent: Extent): Promise<Polygon[]> => {
-  const bbox = `${extent.xmin},${extent.ymin},${extent.xmax},${extent.ymax},EPSG:4326`;
   const params = new URLSearchParams({
-    service: "WFS",
-    version: "2.0.0",
-    request: "GetFeature",
-    typeNames: BUILDING_FOOTPRINTS_TYPE_NAME,
-    outputFormat: "application/json",
-    srsName: "EPSG:4326",
-    bbox,
-    count: String(BUILDING_FOOTPRINTS_FETCH_LIMIT),
+    xmin: String(extent.xmin),
+    ymin: String(extent.ymin),
+    xmax: String(extent.xmax),
+    ymax: String(extent.ymax),
   });
-  const response = await fetch(`${BUILDING_FOOTPRINTS_WFS_URL}?${params}`);
+  const response = await fetch(`${BUILDING_FOOTPRINTS_API_URL}?${params}`);
   if (!response.ok) {
     throw new Error(`Building footprint request failed (${response.status})`);
   }

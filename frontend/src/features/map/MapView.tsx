@@ -17,6 +17,7 @@ import LocatorSearchSource from "@arcgis/core/widgets/Search/LocatorSearchSource
 import Search from "@arcgis/core/widgets/Search";
 import type { BuildingInfo, LayerDefinition, SelectedLocation } from "../../types";
 import {
+  DEFAULT_SUN_DATE_ID,
   DEFAULT_SUN_HOUR,
   ACTIVE_PIN_COLOR,
   BUILDING_COLOR,
@@ -28,8 +29,12 @@ import {
   MAP_CENTER,
   MAP_INITIAL_ZOOM,
   MAX_SUN_HOUR,
+  MIN_FOOTPRINT_ZOOM,
   MIN_SUN_HOUR,
   SAVED_PIN_COLOR,
+  SELECTED_ZOOM,
+  SHADOW_IMAGERY_OPACITY,
+  SUN_DATES,
   TIMELAPSE_END_YEAR,
   TIMELAPSE_FRAME_MS,
   TIMELAPSE_START_YEAR,
@@ -43,6 +48,7 @@ import {
   imageryForYear,
   larimerCountyExtent,
   pinSymbol,
+  sunDate,
 } from "../../lib/map/module";
 
 type MapLocation = { latitude: number; longitude: number; canonicalAddress: string; city?: string };
@@ -65,18 +71,22 @@ interface Props {
 export const MapViewPanel = ({ activeLayers, selected, saved, buildingInfo, onSelect }: Props) => {
   const [basemap, setBasemap] = useState<"streets-navigation-vector" | "satellite">("streets-navigation-vector");
   const [sunHour, setSunHour] = useState(DEFAULT_SUN_HOUR);
+  const [sunDateId, setSunDateId] = useState(DEFAULT_SUN_DATE_ID);
   const [shadowsEnabled, setShadowsEnabled] = useState(false);
   const [viewVersion, setViewVersion] = useState(0);
   const [timelapseEnabled, setTimelapseEnabled] = useState(false);
   const [timelapseYear, setTimelapseYear] = useState(TIMELAPSE_END_YEAR);
   const [timelapsePlaying, setTimelapsePlaying] = useState(false);
+  const [nearbyFootprints, setNearbyFootprints] = useState<Polygon[]>([]);
+  const [footprintsLoading, setFootprintsLoading] = useState(false);
+  const [noteOpen, setNoteOpen] = useState(false);
+  const [noteHovered, setNoteHovered] = useState(false);
   const imageryLayerRefs = useRef(new Map<string, MapImageLayer>());
   const node = useRef<HTMLDivElement>(null);
   const viewRef = useRef<AnyView | null>(null);
   const savedLayerRef = useRef<GraphicsLayer | null>(null);
   const buildingLayerRef = useRef<GraphicsLayer | null>(null);
   const contextBuildingLayerRef = useRef<GraphicsLayer | null>(null);
-  const nearbyFootprintsRef = useRef<Polygon[]>([]);
   const layerRefs = useRef(new Map<string, FeatureLayer | GroupLayer>());
   const onSelectRef = useRef(onSelect);
   onSelectRef.current = onSelect;
@@ -89,8 +99,7 @@ export const MapViewPanel = ({ activeLayers, selected, saved, buildingInfo, onSe
     const map = new ArcGISMap({ basemap, ...(shadowsEnabled ? { ground: "world-elevation" } : {}) });
     let view: AnyView;
     if (shadowsEnabled) {
-      const initialDate = new Date();
-      initialDate.setHours(sunHour, 0, 0, 0);
+      const initialDate = sunDate(sunDateId, sunHour);
       view = new SceneView({
         container: node.current,
         map,
@@ -120,7 +129,8 @@ export const MapViewPanel = ({ activeLayers, selected, saved, buildingInfo, onSe
     } else {
       contextBuildingLayerRef.current = null;
       buildingLayerRef.current = null;
-      nearbyFootprintsRef.current = [];
+      setNearbyFootprints([]);
+      setFootprintsLoading(false);
     }
     const search = new Search({
       view,
@@ -161,7 +171,6 @@ export const MapViewPanel = ({ activeLayers, selected, saved, buildingInfo, onSe
       savedLayerRef.current = null;
       buildingLayerRef.current = null;
       contextBuildingLayerRef.current = null;
-      nearbyFootprintsRef.current = [];
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [shadowsEnabled]);
@@ -172,60 +181,74 @@ export const MapViewPanel = ({ activeLayers, selected, saved, buildingInfo, onSe
     if (!shadowsEnabled || !(view instanceof SceneView) || !layer) {
       return;
     }
-    let cancelled = false;
-    const loadFootprints = () => {
-      void fetchBuildingFootprints(view.extent)
-        .then((footprints) => {
-          if (cancelled || contextBuildingLayerRef.current !== layer) {
-            return;
-          }
-          nearbyFootprintsRef.current = footprints;
-          layer.removeAll();
-          footprints.forEach((geometry) => {
-            layer.add(
-              new Graphic({
-                geometry,
-                symbol: new PolygonSymbol3D({
-                  symbolLayers: [
-                    new ExtrudeSymbol3DLayer({
-                      size: CONTEXT_BUILDING_HEIGHT_FT * FEET_TO_METERS,
-                      castShadows: true,
-                      material: { color: CONTEXT_BUILDING_COLOR },
-                    }),
-                  ],
-                }),
-              }),
-            );
-          });
-        })
-        .catch((error: unknown) => console.error("Unable to load building footprints", error));
-    };
-    if (view.stationary) {
-      loadFootprints();
+    if (!selected) {
+      setFootprintsLoading(false);
+      setNearbyFootprints([]);
+      return;
     }
-    const handle = reactiveUtils.watch(
-      () => view.stationary,
-      (stationary) => {
-        if (stationary) {
-          loadFootprints();
+    let cancelled = false;
+    setFootprintsLoading(true);
+    // Fetched once per selection at building zoom; panning or zooming afterwards does not refetch, which keeps
+    // the extent small and avoids rate limiting the upstream service.
+    void reactiveUtils
+      .whenOnce(() => view.stationary && (view.zoom ?? 0) >= MIN_FOOTPRINT_ZOOM && Boolean(view.extent))
+      .then(() => (cancelled ? [] : fetchBuildingFootprints(view.extent)))
+      .then((footprints) => {
+        if (cancelled || contextBuildingLayerRef.current !== layer) {
+          return;
         }
-      },
-    );
+        setNearbyFootprints(footprints);
+      })
+      .catch((error: unknown) => console.error("Unable to load building footprints", error))
+      .finally(() => {
+        if (!cancelled) {
+          setFootprintsLoading(false);
+        }
+      });
     return () => {
       cancelled = true;
-      handle.remove();
     };
-  }, [shadowsEnabled, viewVersion]);
+  }, [shadowsEnabled, selected, viewVersion]);
+
+  useEffect(() => {
+    const layer = contextBuildingLayerRef.current;
+    if (!layer) {
+      return;
+    }
+    const selectedPoint = selected
+      ? new Point({ longitude: selected.longitude, latitude: selected.latitude })
+      : null;
+    // The selected building is drawn by the effect below with its own color and real height.
+    const selectedFootprint = selectedPoint ? findFootprintAtPoint(nearbyFootprints, selectedPoint) : null;
+    layer.removeAll();
+    nearbyFootprints
+      .filter((geometry) => geometry !== selectedFootprint)
+      .forEach((geometry) => {
+        layer.add(
+          new Graphic({
+            geometry,
+            symbol: new PolygonSymbol3D({
+              symbolLayers: [
+                new ExtrudeSymbol3DLayer({
+                  size: CONTEXT_BUILDING_HEIGHT_FT * FEET_TO_METERS,
+                  castShadows: true,
+                  material: { color: CONTEXT_BUILDING_COLOR },
+                }),
+              ],
+            }),
+          }),
+        );
+      });
+  }, [nearbyFootprints, selected, viewVersion]);
 
   useEffect(() => {
     const view = viewRef.current;
     if (!shadowsEnabled || !(view instanceof SceneView)) {
       return;
     }
-    const date = new Date();
-    date.setHours(sunHour, 0, 0, 0);
+    const date = sunDate(sunDateId, sunHour);
     view.environment.lighting = new SunLighting({ date, directShadowsEnabled: true });
-  }, [sunHour, shadowsEnabled, viewVersion]);
+  }, [sunHour, sunDateId, shadowsEnabled, viewVersion]);
 
   useEffect(() => {
     const layer = buildingLayerRef.current;
@@ -233,14 +256,14 @@ export const MapViewPanel = ({ activeLayers, selected, saved, buildingInfo, onSe
       return;
     }
     layer.removeAll();
-    if (!selected || !buildingInfo) {
+    if (!selected || !buildingInfo || footprintsLoading) {
+      // Hold off on the estimated box until real footprints resolve, otherwise it flashes in and is replaced.
       return;
     }
     // Prefer the real parcel footprint from GIS data when the selected point falls inside one; otherwise fall
     // back to a rectangular approximation derived from assessor square footage and stories.
     const selectedPoint = new Point({ longitude: selected.longitude, latitude: selected.latitude });
-    const footprint =
-      findFootprintAtPoint(nearbyFootprintsRef.current, selectedPoint) ?? buildingFootprint(selected, buildingInfo);
+    const footprint = findFootprintAtPoint(nearbyFootprints, selectedPoint) ?? buildingFootprint(selected, buildingInfo);
     const heightMeters = buildingHeightMeters(buildingInfo);
     layer.add(
       new Graphic({
@@ -256,7 +279,7 @@ export const MapViewPanel = ({ activeLayers, selected, saved, buildingInfo, onSe
         }),
       }),
     );
-  }, [selected, buildingInfo, viewVersion]);
+  }, [selected, buildingInfo, nearbyFootprints, footprintsLoading, viewVersion]);
 
   useEffect(() => {
     const view = viewRef.current;
@@ -371,10 +394,22 @@ export const MapViewPanel = ({ activeLayers, selected, saved, buildingInfo, onSe
 
   useEffect(() => {
     const view = viewRef.current;
-    if (view?.map) {
-      view.map.basemap = basemap;
+    if (!view?.map) {
+      return;
     }
-  }, [basemap, viewVersion]);
+    view.map.basemap = basemap;
+    const opacity = shadowsEnabled && basemap === "satellite" ? SHADOW_IMAGERY_OPACITY : 1;
+    const map = view.map;
+    void map.basemap
+      ?.loadAll()
+      .then(() => {
+        if (viewRef.current?.map !== map) {
+          return;
+        }
+        map.basemap?.baseLayers.forEach((layer) => (layer.opacity = opacity));
+      })
+      .catch((error: unknown) => console.error("Unable to load the basemap", error));
+  }, [basemap, shadowsEnabled, viewVersion]);
 
   useEffect(() => {
     const view = viewRef.current;
@@ -395,6 +430,7 @@ export const MapViewPanel = ({ activeLayers, selected, saved, buildingInfo, onSe
       view.map.add(active, 0);
     }
     active.visible = true;
+    active.opacity = shadowsEnabled ? SHADOW_IMAGERY_OPACITY : 1;
     view.map.reorder(active, 0);
     const target = active;
     let cancelled = false;
@@ -416,7 +452,7 @@ export const MapViewPanel = ({ activeLayers, selected, saved, buildingInfo, onSe
     return () => {
       cancelled = true;
     };
-  }, [timelapseEnabled, timelapseYear, viewVersion]);
+  }, [timelapseEnabled, timelapseYear, shadowsEnabled, viewVersion]);
 
   useEffect(() => {
     if (!timelapseEnabled || !timelapsePlaying) {
@@ -469,13 +505,35 @@ export const MapViewPanel = ({ activeLayers, selected, saved, buildingInfo, onSe
         popupTemplate: { title: "{address}" },
       }),
     );
-    view.goTo({ target: point, zoom: 16 });
+    let cancelled = false;
+    // goTo throws if the view is not ready yet (the effect can run before the first render completes).
+    void view
+      .when()
+      .then(() => {
+        if (!cancelled) {
+          return view.goTo({ target: point, zoom: SELECTED_ZOOM });
+        }
+      })
+      .catch((error: unknown) => {
+        if ((error as { name?: string }).name !== "AbortError") {
+          console.error("Unable to navigate to the selected address", error);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [selected, viewVersion]);
   const sunTimeLabel = new Date(2000, 0, 1, sunHour).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
   const shownImageryYear = imageryForYear(timelapseYear).year;
+  const shadowBoost = shadowsEnabled && (basemap === "satellite" || timelapseEnabled);
   return (
     <div className="map-shell">
-      <div ref={node} className="map-canvas" role="application" aria-label="Larimer County map" />
+      <div
+        ref={node}
+        className={shadowBoost ? "map-canvas shadow-boost" : "map-canvas"}
+        role="application"
+        aria-label="Larimer County map"
+      />
       <div className="basemap-switcher" role="group" aria-label="Basemap">
         <button
           className={basemap === "streets-navigation-vector" ? "active" : ""}
@@ -504,6 +562,18 @@ export const MapViewPanel = ({ activeLayers, selected, saved, buildingInfo, onSe
         </label>
         {shadowsEnabled && (
           <>
+            <select
+              aria-label="Time of year"
+              className="sun-date"
+              value={sunDateId}
+              onChange={(event) => setSunDateId(event.target.value)}
+            >
+              {SUN_DATES.map((option) => (
+                <option key={option.id} value={option.id}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
             <span className="sun-time">{sunTimeLabel}</span>
             <input
               aria-label="Sun time"
@@ -563,9 +633,25 @@ export const MapViewPanel = ({ activeLayers, selected, saved, buildingInfo, onSe
           </>
         )}
       </div>
-      <div className="map-note">
-        Shadows use real Larimer County building footprints where available (est. height elsewhere) · select a
-        result to inspect the property
+      <div
+        className="map-note"
+        onMouseEnter={() => setNoteHovered(true)}
+        onMouseLeave={() => setNoteHovered(false)}
+      >
+        <button
+          type="button"
+          aria-label="Map notes"
+          aria-expanded={noteOpen || noteHovered}
+          onClick={() => setNoteOpen((current) => !current)}
+        >
+          i
+        </button>
+        {(noteOpen || noteHovered) && (
+          <div className="map-note-text" role="note">
+            Shadows use real Larimer County building footprints where available (est. height elsewhere) · select a
+            result to inspect the property
+          </div>
+        )}
       </div>
     </div>
   );

@@ -159,12 +159,37 @@ h1 {
   height: 100%;
   width: 100%;
 }
+/* Shadows wash out over bright aerial imagery; the SDK has no shadow-intensity knob, so darken the render itself.
+   Only the WebGL canvas is filtered so the map widgets stay at full brightness. */
+.map-canvas.shadow-boost canvas {
+  filter: brightness(0.82) contrast(1.3);
+}
 .map-note {
   position: absolute;
   bottom: 12px;
   left: 12px;
+}
+.map-note button {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  background: var(--overlay);
+  border: 1px solid var(--border);
+  box-shadow: 0 4px 12px var(--shadow);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+}
+.map-note .map-note-text {
+  position: absolute;
+  bottom: 30px;
+  left: 0;
   width: 250px;
   background: var(--overlay);
+  border: 1px solid var(--border);
+  box-shadow: 0 4px 12px var(--shadow);
   padding: 7px 10px;
   color: var(--muted);
   font-size: 11px;
@@ -220,6 +245,13 @@ h1 {
 .sun-control .sun-time {
   font-weight: 600;
   color: var(--fg);
+}
+.sun-control .sun-date {
+  font: inherit;
+  padding: 2px 4px;
+  color: var(--fg);
+  background: var(--overlay);
+  border: 1px solid var(--border);
 }
 .timelapse-control {
   position: absolute;
