@@ -1,6 +1,6 @@
 import { app, type HttpRequest, type HttpResponseInit } from "@azure/functions";
 
-export function health(_request: HttpRequest): HttpResponseInit {
+export const health = (_request: HttpRequest): HttpResponseInit => {
   const configured = Boolean(process.env.STORAGE_CONNECTION_STRING || process.env.AzureWebJobsStorage);
   return {
     status: configured ? 200 : 503,

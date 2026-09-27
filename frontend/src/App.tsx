@@ -34,14 +34,18 @@ import "./styles.css";
 type Theme = "light" | "dark";
 const initialTheme = (): Theme => {
   const stored = localStorage.getItem(THEME_KEY);
-  if (stored === "light" || stored === "dark") return stored;
+
+  if (stored === "light" || stored === "dark") {
+    return stored;
+  }
+
   return window.matchMedia?.("(prefers-color-scheme: dark)").matches ? "dark" : "light";
 };
 
 const useStyles = makeStyles({
   root: { minHeight: "100vh", backgroundColor: "var(--bg)", color: tokens.colorNeutralForeground1 },
 });
-function App() {
+const App = () => {
   const classes = useStyles();
   const [theme, setTheme] = useState<Theme>(initialTheme);
   useEffect(() => {

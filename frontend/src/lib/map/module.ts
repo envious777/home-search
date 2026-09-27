@@ -21,17 +21,17 @@ export const larimerCountyExtent = new Extent({
   spatialReference: { wkid: 4326 },
 });
 
-export function imageryForYear(year: number): { year: number; url: string } {
+export const imageryForYear = (year: number): { year: number; url: string } => {
   const imageryYear = [...imageryYears].reverse().find((candidate) => candidate <= year) ?? imageryYears[0];
   return { year: imageryYear, url: `${IMAGERY_ROOT}/${IMAGERY_SERVICES_BY_YEAR[imageryYear]}/MapServer` };
 }
 
-function pinImage(color: string): string {
+const pinImage = (color: string): string => {
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="${MAP_PIN_PATH}" fill="${color}" stroke="${MAP_PIN_OUTLINE}" stroke-width="1"/></svg>`;
   return `data:image/svg+xml,${encodeURIComponent(svg)}`;
 }
 
-export function pinSymbol(color: string, size: number, isScene: boolean) {
+export const pinSymbol = (color: string, size: number, isScene: boolean) => {
   return isScene
     ? new PointSymbol3D({
         symbolLayers: [new IconSymbol3DLayer({ resource: { href: pinImage(color) }, anchor: "bottom", size })],
@@ -47,7 +47,7 @@ export function pinSymbol(color: string, size: number, isScene: boolean) {
       };
 }
 
-export function buildingFootprint(selected: Pick<SelectedLocation, "latitude" | "longitude">, buildingInfo: BuildingInfo) {
+export const buildingFootprint = (selected: Pick<SelectedLocation, "latitude" | "longitude">, buildingInfo: BuildingInfo) => {
   const footprintSqFt = buildingInfo.squareFeet / buildingInfo.stories;
   const widthFt = Math.sqrt(footprintSqFt * FOOTPRINT_ASPECT_RATIO);
   const depthFt = footprintSqFt / widthFt;
@@ -69,6 +69,6 @@ export function buildingFootprint(selected: Pick<SelectedLocation, "latitude" | 
   });
 }
 
-export function buildingHeightMeters(buildingInfo: BuildingInfo): number {
+export const buildingHeightMeters = (buildingInfo: BuildingInfo): number => {
   return buildingInfo.stories * AVG_STORY_HEIGHT_FT * FEET_TO_METERS;
 }

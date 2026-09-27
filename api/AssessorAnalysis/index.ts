@@ -2,9 +2,12 @@ import { app, type HttpRequest, type HttpResponseInit, InvocationContext } from 
 import { analyzeAddress } from "../src/assessor/client.js";
 import { readAddressQuery } from "../src/http/validation.js";
 
-export async function assessorAnalysis(request: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
+export const assessorAnalysis = async (request: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> => {
   const query = readAddressQuery(request.query);
-  if (typeof query === "string") return { status: 400, jsonBody: { error: query } };
+  if (typeof query === "string") {
+    return { status: 400, jsonBody: { error: query } };
+  }
+
   try {
     const result = await analyzeAddress(query);
     return { status: result.status, jsonBody: result.body };

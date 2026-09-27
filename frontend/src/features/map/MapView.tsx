@@ -56,7 +56,7 @@ interface Props {
   }) => void;
 }
 
-export function MapViewPanel({ activeLayers, selected, saved, buildingInfo, onSelect }: Props) {
+export const MapViewPanel = ({ activeLayers, selected, saved, buildingInfo, onSelect }: Props) => {
   const [basemap, setBasemap] = useState<"streets-navigation-vector" | "satellite">("streets-navigation-vector");
   const [sunHour, setSunHour] = useState(DEFAULT_SUN_HOUR);
   const [shadowsEnabled, setShadowsEnabled] = useState(false);
@@ -74,7 +74,10 @@ export function MapViewPanel({ activeLayers, selected, saved, buildingInfo, onSe
   onSelectRef.current = onSelect;
 
   useEffect(() => {
-    if (!node.current) return;
+    if (!node.current) {
+      return;
+    }
+
     const map = new ArcGISMap({ basemap, ...(shadowsEnabled ? { ground: "world-elevation" } : {}) });
     let view: AnyView;
     if (shadowsEnabled) {
@@ -147,7 +150,9 @@ export function MapViewPanel({ activeLayers, selected, saved, buildingInfo, onSe
 
   useEffect(() => {
     const view = viewRef.current;
-    if (!shadowsEnabled || !(view instanceof SceneView)) return;
+    if (!shadowsEnabled || !(view instanceof SceneView)) {
+      return;
+    }
     const date = new Date();
     date.setHours(sunHour, 0, 0, 0);
     view.environment.lighting = new SunLighting({ date, directShadowsEnabled: true });
@@ -155,9 +160,13 @@ export function MapViewPanel({ activeLayers, selected, saved, buildingInfo, onSe
 
   useEffect(() => {
     const layer = buildingLayerRef.current;
-    if (!layer) return;
+    if (!layer) {
+      return;
+    }
     layer.removeAll();
-    if (!selected || !buildingInfo) return;
+    if (!selected || !buildingInfo) {
+      return;
+    }
     // Footprint area = total finished sf spread across stories; use a rectangular approximation for a cuboid.
     const footprint = buildingFootprint(selected, buildingInfo);
     const heightMeters = buildingHeightMeters(buildingInfo);
@@ -179,7 +188,9 @@ export function MapViewPanel({ activeLayers, selected, saved, buildingInfo, onSe
 
   useEffect(() => {
     const view = viewRef.current;
-    if (!view) return;
+    if (!view) {
+      return;
+    }
     const activeIds = new Set(activeLayers.map((layer) => layer.id));
     layerRefs.current.forEach((layer, id) => {
       layer.visible = activeIds.has(id);
@@ -200,7 +211,9 @@ export function MapViewPanel({ activeLayers, selected, saved, buildingInfo, onSe
           const group = new GroupLayer({ title: definition.title, visible: true, layers: imageLayers });
           layerRefs.current.set(definition.id, group);
           view.map?.add(group);
-          if (!definition.pointTable) return;
+          if (!definition.pointTable) {
+            return;
+          }
           const graphicsLayer = new GraphicsLayer({ title: `${definition.title} gages` });
           group.add(graphicsLayer);
           const { latitudeField, longitudeField, dateField, displayField, popupFields } = definition.pointTable;
@@ -215,18 +228,28 @@ export function MapViewPanel({ activeLayers, selected, saved, buildingInfo, onSe
           });
           void fetch(`${definition.url}/query?${params}`)
             .then(async (response) => {
-              if (!response.ok) throw new Error(`Floodwarning query failed (${response.status})`);
+              if (!response.ok) {
+                throw new Error(`Floodwarning query failed (${response.status})`);
+              }
               const result = await response.json();
-              if (result.error) throw new Error(result.error.message ?? "Floodwarning query failed");
-              if (layerRefs.current.get(definition.id) !== group) return;
+              if (result.error) {
+                throw new Error(result.error.message ?? "Floodwarning query failed");
+              }
+              if (layerRefs.current.get(definition.id) !== group) {
+                return;
+              }
               const latestBySensor = new Map<string, Record<string, unknown>>();
               for (const feature of result.features ?? []) {
                 const attributes = feature.attributes as Record<string, unknown>;
                 const sensorName = String(attributes[displayField] ?? "");
                 const latitude = Number(attributes[latitudeField]);
                 const longitude = Number(attributes[longitudeField]);
-                if (!sensorName || !Number.isFinite(latitude) || !Number.isFinite(longitude)) continue;
-                if (!latestBySensor.has(sensorName)) latestBySensor.set(sensorName, attributes);
+                if (!sensorName || !Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+                  continue;
+                }
+                if (!latestBySensor.has(sensorName)) {
+                  latestBySensor.set(sensorName, attributes);
+                }
               }
               latestBySensor.forEach((attributes) => {
                 graphicsLayer.add(
@@ -269,17 +292,23 @@ export function MapViewPanel({ activeLayers, selected, saved, buildingInfo, onSe
       }
     });
     const savedLayer = savedLayerRef.current;
-    if (savedLayer && view.map) view.map.reorder(savedLayer, view.map.layers.length - 1);
+    if (savedLayer && view.map) {
+      view.map.reorder(savedLayer, view.map.layers.length - 1);
+    }
   }, [activeLayers, viewVersion]);
 
   useEffect(() => {
     const view = viewRef.current;
-    if (view?.map) view.map.basemap = basemap;
+    if (view?.map) {
+      view.map.basemap = basemap;
+    }
   }, [basemap, viewVersion]);
 
   useEffect(() => {
     const view = viewRef.current;
-    if (!view?.map) return;
+    if (!view?.map) {
+      return;
+    }
     const layers = imageryLayerRefs.current;
     if (!timelapseEnabled) {
       layers.forEach((layer) => (layer.visible = false));
@@ -302,9 +331,13 @@ export function MapViewPanel({ activeLayers, selected, saved, buildingInfo, onSe
       .whenLayerView(target)
       .then((layerView) => reactiveUtils.whenOnce(() => !layerView.updating))
       .then(() => {
-        if (cancelled) return;
+        if (cancelled) {
+          return;
+        }
         layers.forEach((layer) => {
-          if (layer !== target) layer.visible = false;
+          if (layer !== target) {
+            layer.visible = false;
+          }
         });
       })
       .catch((error: unknown) => console.error("Unable to load historical imagery", error));
@@ -314,7 +347,9 @@ export function MapViewPanel({ activeLayers, selected, saved, buildingInfo, onSe
   }, [timelapseEnabled, timelapseYear, viewVersion]);
 
   useEffect(() => {
-    if (!timelapseEnabled || !timelapsePlaying) return;
+    if (!timelapseEnabled || !timelapsePlaying) {
+      return;
+    }
     const timer = window.setInterval(() => {
       setTimelapseYear((current) => imageryYears.find((year) => year > current) ?? imageryYears[0]);
     }, TIMELAPSE_FRAME_MS);
@@ -323,7 +358,9 @@ export function MapViewPanel({ activeLayers, selected, saved, buildingInfo, onSe
 
   useEffect(() => {
     const layer = savedLayerRef.current;
-    if (!layer) return;
+    if (!layer) {
+      return;
+    }
     const isScene = viewRef.current instanceof SceneView;
     layer.removeAll();
     saved.forEach((item) => {
@@ -331,7 +368,9 @@ export function MapViewPanel({ activeLayers, selected, saved, buildingInfo, onSe
         selected?.canonicalAddress === item.canonicalAddress &&
         selected.latitude === item.latitude &&
         selected.longitude === item.longitude;
-      if (isSelected) return;
+      if (isSelected) {
+        return;
+      }
       layer.add(
         new Graphic({
           geometry: new Point({ longitude: item.longitude, latitude: item.latitude }),
@@ -345,7 +384,9 @@ export function MapViewPanel({ activeLayers, selected, saved, buildingInfo, onSe
 
   useEffect(() => {
     const view = viewRef.current;
-    if (!view || !selected) return;
+    if (!view || !selected) {
+      return;
+    }
     view.graphics.removeAll();
     const point = new Point({ longitude: selected.longitude, latitude: selected.latitude });
     view.graphics.add(
@@ -412,7 +453,9 @@ export function MapViewPanel({ activeLayers, selected, saved, buildingInfo, onSe
             checked={timelapseEnabled}
             onChange={(event) => {
               setTimelapseEnabled(event.target.checked);
-              if (!event.target.checked) setTimelapsePlaying(false);
+              if (!event.target.checked) {
+                setTimelapsePlaying(false);
+              }
             }}
           />{" "}
           Imagery Timelapse

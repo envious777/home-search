@@ -13,7 +13,7 @@ export const sections: SectionName[] = [
   "treasurerTaxDistrict",
 ];
 
-export function propertyUrl(address: AddressQuery): string {
+export const propertyUrl = (address: AddressQuery): string => {
   const params = new URLSearchParams({
     prop: "property",
     parcel: "undefined",
@@ -32,7 +32,7 @@ export function propertyUrl(address: AddressQuery): string {
   return `${BASE}/property/?${params}`;
 }
 
-export function sectionUrl(section: SectionName, accountno: string, year: string): string {
+export const sectionUrl = (section: SectionName, accountno: string, year: string): string => {
   const prop: Record<SectionName, string> = {
     detail: "detail",
     sales: "sales",
@@ -46,6 +46,9 @@ export function sectionUrl(section: SectionName, accountno: string, year: string
   };
   const base = section.startsWith("treasurer") ? `${BASE}/treasurer/` : `${BASE}/`;
   const query = new URLSearchParams({ prop: prop[section], accountno });
-  if (section === "treasurerTaxDistrict") query.set("yr", year);
+  if (section === "treasurerTaxDistrict") {
+    query.set("yr", year);
+  }
+
   return `${base}?${query}`;
 }

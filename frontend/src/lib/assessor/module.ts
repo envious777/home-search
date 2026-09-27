@@ -7,24 +7,33 @@ export interface Table {
   records: Row[];
 }
 
-export function asTable(data: unknown): Table | null {
-  if (!data || typeof data !== "object") return null;
+export const asTable = (data: unknown): Table | null => {
+  if (!data || typeof data !== "object") {
+    return null;
+  }
+
   const { columns, records } = data as Partial<Table>;
   return Array.isArray(columns) && Array.isArray(records) ? { columns, records } : null;
 }
 
-export function extractBuildingInfo(analysis: AssessorAnalysis | null): BuildingInfo | null {
+export const extractBuildingInfo = (analysis: AssessorAnalysis | null): BuildingInfo | null => {
   const data = analysis?.sections.improvement?.data as
     { records?: Array<{ sf?: string | null; stories?: string | null }> } | undefined;
   const record = data?.records?.[0];
   const squareFeet = Number(record?.sf);
   const stories = Number(record?.stories);
-  if (!Number.isFinite(squareFeet) || squareFeet <= 0 || !Number.isFinite(stories) || stories <= 0) return null;
+  if (!Number.isFinite(squareFeet) || squareFeet <= 0 || !Number.isFinite(stories) || stories <= 0) {
+    return null;
+  }
+
   return { squareFeet, stories };
 }
 
 export const num = (value: string | null | undefined) => {
-  if (value == null || value.trim() === "") return null;
+  if (value == null || value.trim() === "") {
+    return null;
+  }
+
   const parsed = Number(value);
   return Number.isNaN(parsed) ? null : parsed;
 };
@@ -52,9 +61,12 @@ export const humanize = (key: string) =>
     .replace(/^\w/, (character) => character.toUpperCase());
 export const pct = (value: number) => `${value >= 0 ? "+" : ""}${decimal.format(value * 100)}%`;
 
-export function splitParcel(parcel: string | null | undefined): [string, string][] | null {
+export const splitParcel = (parcel: string | null | undefined): [string, string][] | null => {
   const digits = parcel?.replace(/\D/g, "") ?? "";
-  if (digits.length !== 10) return null;
+  if (digits.length !== 10) {
+    return null;
+  }
+
   let offset = 0;
   return parcelParts.map(([label, length]) => [label, digits.slice(offset, (offset += length))]);
 }

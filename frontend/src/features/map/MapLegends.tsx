@@ -7,9 +7,13 @@ interface Props {
   layer?: LayerDefinition;
 }
 
-export function MapLegends({ layer }: Props) {
+export const MapLegends = ({ layer }: Props) => {
   const [isOpen, setIsOpen] = useState(false);
-  if (!layer?.legend?.length) return null;
+
+  if (!layer?.legend?.length) {
+    return null;
+  }
+
   const legendId = `legend-${layer.id}`;
 
   return (

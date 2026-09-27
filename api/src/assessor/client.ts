@@ -2,34 +2,40 @@ import { propertyUrl, sectionUrl, sections } from "./endpoints.js";
 import type { AddressQuery, AssessorResponse, SectionName, SectionResult } from "../models/assessor.js";
 
 const timeoutMs = 8000;
-async function fetchJson(url: string): Promise<unknown> {
+const fetchJson = async (url: string): Promise<unknown> => {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const response = await fetch(url, { signal: controller.signal, headers: { Accept: "application/json" } });
-    if (!response.ok) throw new Error(`upstream status ${response.status}`);
+    if (!response.ok) {
+      throw new Error(`upstream status ${response.status}`);
+    }
+
     return await response.json();
   } finally {
     clearTimeout(timer);
   }
 }
 
-function findAccount(payload: unknown): string | null {
+const findAccount = (payload: unknown): string | null => {
   const container =
     payload && typeof payload === "object" && !Array.isArray(payload)
       ? ((payload as Record<string, unknown>).records ?? (payload as Record<string, unknown>).data ?? payload)
       : payload;
   const item = Array.isArray(container) ? container[0] : container;
-  if (!item || typeof item !== "object") return null;
+  if (!item || typeof item !== "object") {
+    return null;
+  }
+
   const record = item as Record<string, unknown>;
   const candidate = record.accountno ?? record.accountNo ?? record.account_number ?? record.AccountNo;
   return typeof candidate === "string" && candidate.length > 0 ? candidate : null;
 }
 
-export async function analyzeAddress(
+export const analyzeAddress = async (
   address: AddressQuery,
   year = process.env.TAX_YEAR ?? "2025",
-): Promise<{ status: number; body: AssessorResponse }> {
+): Promise<{ status: number; body: AssessorResponse }> => {
   let property: unknown;
   try {
     property = await fetchJson(propertyUrl(address));

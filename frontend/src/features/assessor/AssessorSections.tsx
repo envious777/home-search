@@ -16,7 +16,7 @@ import {
 import { asTable, count, date, humanize, money, num, pct, splitParcel, text, type Table } from "../../lib/assessor/module";
 type Sections = AssessorAnalysis["sections"];
 
-function KeyValues({ items }: { items: [string, ReactNode][] }) {
+const KeyValues = ({ items }: { items: [string, ReactNode][] }) => {
   return (
     <dl className="kv">
       {items.map(([label, value]) => (
@@ -29,7 +29,7 @@ function KeyValues({ items }: { items: [string, ReactNode][] }) {
   );
 }
 
-function Stats({ items }: { items: [string, ReactNode, ReactNode?][] }) {
+const Stats = ({ items }: { items: [string, ReactNode, ReactNode?][] }) => {
   return (
     <div className="stats">
       {items.map(([label, value, sub]) => (
@@ -43,7 +43,7 @@ function Stats({ items }: { items: [string, ReactNode, ReactNode?][] }) {
   );
 }
 
-function DataTable({ table }: { table: Table }) {
+const DataTable = ({ table }: { table: Table }) => {
   return (
     <div className="data-table">
       <table>
@@ -68,9 +68,13 @@ function DataTable({ table }: { table: Table }) {
   );
 }
 
-function ParcelNumber({ parcel }: { parcel: string | null }) {
+const ParcelNumber = ({ parcel }: { parcel: string | null }) => {
   const parts = splitParcel(parcel);
-  if (!parts) return null;
+
+  if (!parts) {
+    return null;
+  }
+
   return (
     <div className="parcel" aria-label={`Parcel ${parcel}`}>
       {parts.map(([label, value]) => (
@@ -83,7 +87,7 @@ function ParcelNumber({ parcel }: { parcel: string | null }) {
   );
 }
 
-function Detail({ records: [r] }: Table) {
+const Detail = ({ records: [r] }: Table) => {
   const mailing = [r.mailaddress1, r.mailaddress2].filter(Boolean).join(", ");
   const mailingCity = [r.mailcity, r.mailstate, r.mailzipcode?.slice(0, 5)].filter(Boolean).join(" ");
   const absentee = Boolean(
@@ -118,7 +122,7 @@ function Detail({ records: [r] }: Table) {
   );
 }
 
-function Improvement({ records }: Table) {
+const Improvement = ({ records }: Table) => {
   return (
     <>
       {records.map((r, index) => (
@@ -153,7 +157,7 @@ function Improvement({ records }: Table) {
   );
 }
 
-function ImprovementDetail({ records }: Table) {
+const ImprovementDetail = ({ records }: Table) => {
   const grouped = new Map<string, { type: string; descr: string; units: number }>();
   for (const r of records) {
     const key = `${r.detailtype}|${r.detaildescr}`;
@@ -178,7 +182,7 @@ function ImprovementDetail({ records }: Table) {
   );
 }
 
-function ValueDetail({ records }: Table) {
+const ValueDetail = ({ records }: Table) => {
   const total = records.reduce((sum, r) => sum + (num(r.actval) ?? 0), 0);
   const assessed = records.reduce((sum, r) => sum + (num(r.rawassdval) ?? 0), 0);
   const colors = valueColors;
@@ -225,7 +229,7 @@ function ValueDetail({ records }: Table) {
   );
 }
 
-function Sales({ records }: Table) {
+const Sales = ({ records }: Table) => {
   const sorted = [...records].sort((a, b) => (b.saledt ?? "").localeCompare(a.saledt ?? ""));
   const market = sorted.filter((r) => (num(r.salep) ?? 0) > 0);
   return (
@@ -250,7 +254,7 @@ function Sales({ records }: Table) {
   );
 }
 
-function LandAttributes({ records }: Table) {
+const LandAttributes = ({ records }: Table) => {
   return (
     <div className="chips">
       {records.map((r, i) => (
@@ -263,7 +267,7 @@ function LandAttributes({ records }: Table) {
   );
 }
 
-function Limit({ records: [r] }: Table) {
+const Limit = ({ records: [r] }: Table) => {
   return (
     <KeyValues
       items={[
@@ -277,7 +281,7 @@ function Limit({ records: [r] }: Table) {
   );
 }
 
-function TaxHistory({ records }: Table) {
+const TaxHistory = ({ records }: Table) => {
   const years = [...records].sort((a, b) => (num(a.TAX_YEAR) ?? 0) - (num(b.TAX_YEAR) ?? 0));
   const latest = years[years.length - 1];
   const first = years[0];
@@ -353,7 +357,7 @@ function TaxHistory({ records }: Table) {
   );
 }
 
-function TaxDistricts({ records }: Table) {
+const TaxDistricts = ({ records }: Table) => {
   const latestYear = Math.max(...records.map((r) => num(r.TAX_YEAR) ?? 0));
   const rows = records
     .filter((r) => (num(r.TAX_YEAR) ?? 0) === latestYear)
@@ -399,7 +403,7 @@ const views: Record<string, { render: (table: Table) => ReactNode }> = {
   landAttributes: { render: LandAttributes },
   limit: { render: Limit },
 };
-export function AssessorSections({ sections }: { sections: Sections }) {
+export const AssessorSections = ({ sections }: { sections: Sections }) => {
   const names = Object.keys(sections).sort(
     (a, b) =>
       (assessorSectionOrder.indexOf(a) + 1 || Infinity) - (assessorSectionOrder.indexOf(b) + 1 || Infinity),
@@ -413,11 +417,13 @@ export function AssessorSections({ sections }: { sections: Sections }) {
         const table = asTable(section.data);
         const title = metadata?.title ?? humanize(name);
         let body: ReactNode;
-        if (section.status !== "fulfilled")
+        if (section.status !== "fulfilled") {
           body = <p className="empty">Unavailable{section.error ? `: ${section.error}` : ""}</p>;
-        else if (!table || table.records.length === 0) body = <p className="empty">No records.</p>;
-        else if (!view) body = <DataTable table={table} />;
-        else
+        } else if (!table || table.records.length === 0) {
+          body = <p className="empty">No records.</p>;
+        } else if (!view) {
+          body = <DataTable table={table} />;
+        } else {
           body = (
             <>
               {view.render(table)}
@@ -427,6 +433,7 @@ export function AssessorSections({ sections }: { sections: Sections }) {
               </details>
             </>
           );
+        }
         return (
           <details
             className={`assessor-section ${section.status !== "fulfilled" ? "unavailable" : ""}`}
