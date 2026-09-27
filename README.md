@@ -50,8 +50,7 @@ Run the frontend:
 npm run dev --workspace frontend
 ```
 
-Open the Vite URL shown in the terminal, normally `http://127.0.0.1:5173/`. The frontend proxy sends assessor requests to the Functions host; no frontend API URL configuration is required for local development.
-The browser calls the county services directly, so no Functions host is required for the normal frontend workflow. To work on optional backend features, start Azurite when needed and run `func start` from `api/` in a separate terminal. The Vite `/api` proxy is retained for manually exercising that backend endpoint, but the frontend does not depend on it.
+Open the Vite URL shown in the terminal, normally `http://127.0.0.1:5173/`. The browser calls the county services directly, so no Functions host is required for the normal frontend workflow. To work on optional backend features, start Azurite when needed and run `func start` from `api/` in a separate terminal. The Vite `/api` proxy is retained for manually exercising that backend endpoint, but the frontend does not depend on it.
 
 The API's local defaults are in [api/local.settings.json](api/local.settings.json). `TAX_YEAR` controls the treasurer tax-district request and defaults to `2025` when the setting is absent:
 
@@ -91,6 +90,16 @@ npm run build --workspace frontend
 ```
 
 No backend deployment or `VITE_API_BASE_URL` setting is required.
+
+### GitHub Pages
+
+The repository includes [`.github/workflows/deploy-pages.yml`](.github/workflows/deploy-pages.yml). To enable it:
+
+1. Push the repository to GitHub with the default branch named `main`.
+2. In **Settings → Pages**, set **Source** to **GitHub Actions**.
+3. Push to `main`, or run **Deploy frontend to GitHub Pages** from the repository's **Actions** tab.
+
+The workflow builds `frontend/dist` and publishes the site at `https://<owner>.github.io/<repository>/`. Vite detects the GitHub repository name during the workflow and sets the correct asset base path. The workflow only deploys the frontend; the optional `api/` Azure Functions project is not required.
 
 The frontend tests cover browser storage behavior, while the API tests cover assessor endpoint and aggregation behavior. Tests that call public county or ArcGIS services may also depend on network availability when run outside the mocked test paths.
 
