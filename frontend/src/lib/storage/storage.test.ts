@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { loadSaved, saveLocation, removeLocation } from "./storage/module";
+import { saveLocation, removeLocation, loadSaved } from "./module";
+
 const location = {
   id: "one",
   canonicalAddress: "2743 Wyandotte Street, Fort Collins, CO",
@@ -8,6 +9,7 @@ const location = {
   attributes: {},
   savedAt: "2026-01-01",
 };
+
 describe("saved locations", () => {
   beforeEach(() => localStorage.clear());
   it("is idempotent and removable", () => {
