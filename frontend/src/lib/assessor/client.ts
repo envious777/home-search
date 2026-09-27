@@ -1,6 +1,5 @@
 import type { AssessorAnalysis } from "../../types";
-
-const apiBase = (import.meta.env.VITE_API_BASE_URL ?? "/api").replace(/\/$/, "");
+import { apiBase } from "../global";
 
 export const analyzeAddress = async (params: URLSearchParams): Promise<AssessorAnalysis> => {
   const response = await fetch(`${apiBase}/assessor-analysis?${params}`, {

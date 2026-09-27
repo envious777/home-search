@@ -19,6 +19,7 @@ import {
   MAP_PIN_PATH,
   SUN_DATES,
 } from "./constants";
+import { apiBase } from "../global";
 
 export const larimerCountyExtent = new Extent({
   ...LARIMER_COUNTY_BOUNDS,
@@ -108,7 +109,7 @@ export const fetchBuildingFootprints = async (extent: Extent): Promise<Polygon[]
     xmax: String(extent.xmax),
     ymax: String(extent.ymax),
   });
-  const response = await fetch(`${BUILDING_FOOTPRINTS_API_URL}?${params}`);
+  const response = await fetch(`${apiBase}/building-footprints?${params}`);
   if (!response.ok) {
     throw new Error(`Building footprint request failed (${response.status})`);
   }
