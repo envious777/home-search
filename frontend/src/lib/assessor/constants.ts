@@ -4,9 +4,6 @@ export const currency = new Intl.NumberFormat("en-US", {
   maximumFractionDigits: 0,
 });
 export const decimal = new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 });
-export const ASSESSOR_API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "";
-export const ASSESSOR_ANALYSIS_PATH = "/api/assessor-analysis";
-
 export const deedTypes: Record<string, string> = {
   WD: "Warranty deed",
   WDJ: "Warranty deed (joint tenancy)",

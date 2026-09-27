@@ -23,7 +23,7 @@ import { AssessorSections } from "./features/assessor/AssessorSections";
 import { MapLegends } from "./features/map/MapLegends";
 import { MapViewPanel } from "./features/map/MapView";
 import { layers } from "./lib/map/constants";
-import { ASSESSOR_ANALYSIS_PATH, ASSESSOR_API_BASE_URL } from "./lib/assessor/constants";
+import { analyzeAddress } from "./lib/assessor/client";
 import { extractBuildingInfo } from "./lib/assessor/module";
 import { toAddressQuery } from "./lib/address/module";
 import { loadSaved, removeLocation, saveLocation } from "./lib/storage/module";
@@ -83,8 +83,7 @@ const App = () => {
     setLoading(true);
     try {
       const params = toAddressQuery(location.canonicalAddress, location.city);
-      const response = await fetch(`${ASSESSOR_API_BASE_URL}${ASSESSOR_ANALYSIS_PATH}?${params}`);
-      setAnalysis(response.ok || response.status === 206 ? ((await response.json()) as AssessorAnalysis) : null);
+      setAnalysis(await analyzeAddress(params));
     } catch {
       setAnalysis(null);
     } finally {
@@ -228,5 +227,5 @@ const App = () => {
       </div>
     </FluentProvider>
   );
-}
+};
 export default App;

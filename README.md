@@ -15,14 +15,14 @@ Home Search is a Larimer County property exploration tool. It combines an ArcGIS
 
 ## Architecture
 
-The repository is an npm workspace with two independently buildable applications:
+The repository is an npm workspace with a static frontend and an optional backend:
 
-| Package    | Role                                                                                                                                |
-| ---------- | ----------------------------------------------------------------------------------------------------------------------------------- |
-| `frontend` | React 19 + Vite UI, Fluent UI controls, and ArcGIS Maps SDK for JavaScript map experience                                           |
-| `api`      | Node.js Azure Functions v4 HTTP endpoint that normalizes the request, looks up the county account, and aggregates assessor sections |
+| Package    | Role                                                                                                                              |
+| ---------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `frontend` | React 19 + Vite UI, Fluent UI controls, ArcGIS Maps SDK for JavaScript map experience, and browser-side assessor aggregation      |
+| `api`      | Optional Node.js Azure Functions v4 HTTP endpoint for server-side assessor aggregation and future persistence or complex analysis |
 
-In local development, Vite serves the frontend and proxies `/api` requests to the Azure Functions host at `http://127.0.0.1:7071`. The frontend uses public ArcGIS and Larimer County services directly for map, geocoding, imagery, and operational layers.
+The frontend calls the public ArcGIS and Larimer County services directly from the browser for map, geocoding, imagery, operational layers, and assessor analysis. It does not require the `api` package, an Azure Functions host, or a configured API URL, so the built frontend can be deployed to static hosting such as GitHub Pages or Azure Static Web Apps. The `api` package remains available when server-side features are needed.
 
 ## Local development
 
@@ -30,7 +30,7 @@ In local development, Vite serves the frontend and proxies `/api` requests to th
 
 - Node.js with npm
 - Azure Functions Core Tools v4
-- Docker, only if the local Azurite storage emulator is not already running
+- Docker, only if you want to run the optional API with the local Azurite storage emulator
 
 Install dependencies from the repository root:
 
@@ -44,18 +44,14 @@ Start the local storage emulator when needed:
 docker compose up -d
 ```
 
-Run the API and frontend in separate terminals:
-
-```sh
-cd api
-func start
-```
+Run the frontend:
 
 ```sh
 npm run dev --workspace frontend
 ```
 
 Open the Vite URL shown in the terminal, normally `http://127.0.0.1:5173/`. The frontend proxy sends assessor requests to the Functions host; no frontend API URL configuration is required for local development.
+The browser calls the county services directly, so no Functions host is required for the normal frontend workflow. To work on optional backend features, start Azurite when needed and run `func start` from `api/` in a separate terminal. The Vite `/api` proxy is retained for manually exercising that backend endpoint, but the frontend does not depend on it.
 
 The API's local defaults are in [api/local.settings.json](api/local.settings.json). `TAX_YEAR` controls the treasurer tax-district request and defaults to `2025` when the setting is absent:
 
@@ -87,6 +83,14 @@ Formatting is checked with:
 ```sh
 npm run format:check
 ```
+
+For a static deployment, build only the frontend and publish `frontend/dist`:
+
+```sh
+npm run build --workspace frontend
+```
+
+No backend deployment or `VITE_API_BASE_URL` setting is required.
 
 The frontend tests cover browser storage behavior, while the API tests cover assessor endpoint and aggregation behavior. Tests that call public county or ArcGIS services may also depend on network availability when run outside the mocked test paths.
 
@@ -120,23 +124,22 @@ Selecting a geocoded address on the map loads Larimer County assessor and treasu
 ```mermaid
 sequenceDiagram
   participant UI as Frontend (App.tsx)
-  participant API as /api/assessor-analysis
   participant LC as apps.larimer.org/api/assessor2
-  UI->>API: GET ?fromAddrNum&toAddrNum&address&city
-  API->>LC: property search (address → accountno)
+  UI->>LC: property search (address → accountno)
   par 9 section requests
-    API->>LC: detail, sales, landatt, improvement, valuedetail, impdtl, limit
-    API->>LC: treasurer/propinfo, treasurer/taxdist
+    UI->>LC: detail, sales, landatt, improvement, valuedetail, impdtl, limit
+    UI->>LC: treasurer/propinfo, treasurer/taxdist
   end
-  API-->>UI: AssessorResponse (200 / 206)
   UI->>UI: AssessorSections renders each section
 ```
 
 1. **Address normalization** — [frontend/src/App.tsx](frontend/src/App.tsx) (`toAddressQuery`) splits the canonical address into a house number and a bare street name. Directionals (`N`, `SW`, …) and suffixes (`Dr`, `Ave`, …) are stripped because the Larimer search only matches bare street names. The city returned by the geocoder is passed through to the county search.
-2. **Account lookup** — [api/src/assessor/client.ts](api/src/assessor/client.ts) calls the property search and extracts the first `accountno`.
-3. **Section fan-out** — all sections are fetched in parallel with `Promise.allSettled`, each with an 8 s timeout. A failing section does not fail the request.
+2. **Browser aggregation** — [frontend/src/lib/assessor/client.ts](frontend/src/lib/assessor/client.ts) calls the property search, extracts the first `accountno`, and fetches all sections directly from the county service.
+3. **Partial results** — all sections are fetched in parallel with `Promise.allSettled`, each with an 8 s timeout. A failing section does not fail the analysis.
 
-### API
+### Optional API
+
+The frontend does not call this endpoint. The Azure Functions implementation remains in `api/` as an optional server-side path for future features such as persistence, credentials or request mediation, and more complex analysis functions. Its contract is preserved for independent use:
 
 `GET /api/assessor-analysis`
 
