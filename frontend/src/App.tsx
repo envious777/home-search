@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Button,
   Checkbox,
@@ -67,6 +67,8 @@ const App = () => {
   const [saved, setSaved] = useState(loadSaved);
   const [analysis, setAnalysis] = useState<AssessorAnalysis | null>(null);
   const [loading, setLoading] = useState(false);
+  const [analysisError, setAnalysisError] = useState<string | null>(null);
+  const requestId = useRef(0);
   const toggleLayer = (id: string) =>
     setActive((current) => {
       const next = new Set(current);
@@ -74,20 +76,26 @@ const App = () => {
       return next;
     });
   const selectLocation = async (location: Omit<SelectedLocation, "id" | "savedAt">) => {
+    const currentRequest = ++requestId.current;
     const next = {
       ...location,
       id: `${location.canonicalAddress}:${location.latitude.toFixed(5)}:${location.longitude.toFixed(5)}`,
       savedAt: new Date().toISOString(),
     };
     setSelected(next);
+    setAnalysis(null);
+    setAnalysisError(null);
     setLoading(true);
     try {
       const params = toAddressQuery(location.canonicalAddress, location.city);
-      setAnalysis(await analyzeAddress(params));
-    } catch {
-      setAnalysis(null);
+      const result = await analyzeAddress(params);
+      if (currentRequest === requestId.current) setAnalysis(result);
+    } catch (error) {
+      if (currentRequest === requestId.current) {
+        setAnalysisError(error instanceof Error ? error.message : "Assessor analysis is unavailable. Please retry.");
+      }
     } finally {
-      setLoading(false);
+      if (currentRequest === requestId.current) setLoading(false);
     }
   };
   const activeLayers = layers.filter((layer) => active.has(layer.id));
@@ -209,10 +217,12 @@ const App = () => {
                 <span className="badge ready">ready</span>
               ) : null}
             </div>
-            {!analysis && !loading ? (
-              <p className="empty">Select a geocoded address to load Larimer County property facts.</p>
-            ) : loading ? (
+            {loading ? (
               <p className="empty">Checking property records...</p>
+            ) : analysisError ? (
+              <p className="empty" role="alert">{analysisError}</p>
+            ) : !analysis ? (
+              <p className="empty">Select a geocoded address to load Larimer County property facts.</p>
             ) : (
               <>
                 <div className="account">
