@@ -10,7 +10,8 @@
     "dev": "func start --port 7071"
   },
   "dependencies": {
-    "@azure/functions": "^4.7.2"
+    "@azure/functions": "^4.7.2",
+    "shpjs": "^6.2.0"
   },
   "devDependencies": {
     "@types/node": "^24.3.0",
