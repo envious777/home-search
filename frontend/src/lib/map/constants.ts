@@ -110,7 +110,21 @@ export const layers: LayerDefinition[] = [
     title: "Bikeway System",
     url: "https://services1.arcgis.com/dLpFH5mwVvxSN4OE/arcgis/rest/services/BikeFacilities/FeatureServer/0/query",
     color: "#7C3AED",
-    description: "Bike facilities and routes",
+    description: "Bike facilities, routes, and bike-use trails",
+    extraFeatureLayers: [
+      {
+        title: "Trails (bike use)",
+        url: "https://services1.arcgis.com/dLpFH5mwVvxSN4OE/arcgis/rest/services/Trails/FeatureServer/0",
+        definitionExpression: "BIKEUSE = 'Yes'",
+      },
+    ],
+  },
+  {
+    id: "trails",
+    title: "Trails",
+    url: "https://services1.arcgis.com/dLpFH5mwVvxSN4OE/arcgis/rest/services/Trails/FeatureServer/0",
+    color: "#15803D",
+    description: "All trails",
   },
   {
     id: "flood-warning",

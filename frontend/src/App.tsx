@@ -28,23 +28,14 @@ import { extractBuildingInfo } from "./lib/assessor/module";
 import { toAddressQuery } from "./lib/address/module";
 import { loadSaved, removeLocation, saveLocation } from "./lib/storage/module";
 import { THEME_KEY } from "./lib/storage/constants";
-import type { AssessorAnalysis, LayerDefinition, SelectedLocation } from "./types";
+import type { AssessorAnalysis, LayerDefinition, SelectedLocation, Theme } from "./types";
 import "./styles.css";
-
-type Theme = "light" | "dark";
-const initialTheme = (): Theme => {
-  const stored = localStorage.getItem(THEME_KEY);
-
-  if (stored === "light" || stored === "dark") {
-    return stored;
-  }
-
-  return window.matchMedia?.("(prefers-color-scheme: dark)").matches ? "dark" : "light";
-};
+import { initialTheme } from "./lib/global";
 
 const useStyles = makeStyles({
   root: { minHeight: "100vh", backgroundColor: "var(--bg)", color: tokens.colorNeutralForeground1 },
 });
+
 const App = () => {
   const classes = useStyles();
   const [theme, setTheme] = useState<Theme>(initialTheme);
@@ -139,18 +130,10 @@ const App = () => {
             />
           </section>
           <aside className="sidebar">
-            <div className="panel search-panel">
-              <span className="panel-label">
-                <SearchRegular /> QUICK SEARCH
-              </span>
-              <p className="hint">
-                Use the search box on the map (top-right) for address suggestions across Larimer County.
-              </p>
-            </div>
             <div className="panel">
               <div className="panel-title">
                 <span>Operational layers</span>
-                <span className="count">{activeLayers.length}/4 on</span>
+                <span className="count">{activeLayers.length}/{layers.length} on</span>
               </div>
               {layers.map((layer: LayerDefinition) => (
                 <div className="layer-item" key={layer.id}>

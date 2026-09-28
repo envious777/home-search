@@ -299,7 +299,7 @@ h1 {
 .sidebar {
   border-left: 1px solid var(--border);
   background: var(--bg);
-  padding: 24px 20px;
+  padding: 24px 20px 0 20px;
   overflow: auto;
 }
 .panel {
@@ -542,12 +542,14 @@ h1 {
   min-height: 120px;
   display: flex;
   flex-direction: column;
+  border-bottom: 0;
+  margin-bottom: 0;
+  padding-bottom: 0;
 }
 .saved-list {
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
-  margin-bottom: 8px;
 }
 .saved-panel > :not(.saved-list) {
   flex: none;

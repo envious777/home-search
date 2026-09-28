@@ -10,19 +10,20 @@ Home Search is a Larimer County property exploration tool. It combines an ArcGIS
 - Saves selected locations in browser `localStorage` for quick return visits.
 - Loads assessor and treasurer data for a selected address, with partial results when an individual upstream section is unavailable.
 - Supports light and dark themes, persisted in browser `localStorage`.
-- Provides optional 3D sun shadows. The selected building is represented by an estimated extrusion based on assessor square footage and story count; it is not a surveyed building footprint.
+- Provides optional 3D sun shadows. The selected building is rendered as an estimated extrusion based on assessor square footage and story count, and nearby real parcel footprints are used when available to improve the shadow context.
 - Provides a historical imagery timelapse from 1999 through 2025. If an exact year is not published, the nearest earlier Larimer County imagery service is shown.
+- Fetches nearby building footprints through the local API proxy so the 3D experience can use real parcel geometry without CORS issues.
 
 ## Architecture
 
 The repository is an npm workspace with a static frontend and an optional backend:
 
-| Package    | Role                                                                                                                              |
-| ---------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| `frontend` | React 19 + Vite UI, Fluent UI controls, ArcGIS Maps SDK for JavaScript map experience, and assessor analysis display |
-| `api`      | Node.js Azure Functions v4 HTTP endpoint for server-side assessor aggregation                               |
+| Package    | Role                                                                                                                                                  |
+| ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `frontend` | React 19 + Vite UI, Fluent UI controls, ArcGIS Maps SDK for JavaScript map experience, and assessor analysis display                                     |
+| `api`      | Node.js Azure Functions v4 HTTP endpoints for server-side assessor aggregation and building-footprint proxy                                              |
 
-The frontend calls public ArcGIS services directly for map, geocoding, imagery, and operational layers. Assessor analysis uses `GET /api/assessor-analysis` on the Functions host. The UI can be deployed separately, but assessor analysis requires a reachable API.
+The frontend calls public ArcGIS services directly for map, geocoding, imagery, and operational layers. Assessor analysis uses `GET /api/assessor-analysis`, and 3D shadowing also calls `GET /api/building-footprints` to fetch nearby parcel geometry from the proxy. The UI can be deployed separately, but assessor analysis and footprint-based shadows require a reachable API.
 
 ## Local development
 
@@ -44,13 +45,22 @@ Start the local storage emulator:
 docker compose up -d
 ```
 
-Start the API with `func start` from `api/` in a separate terminal, then run the frontend:
+Start the API from `api/` in a separate terminal:
+
+```sh
+cd api
+npm run dev
+```
+
+Then run the frontend from the repo root:
 
 ```sh
 npm run dev --workspace frontend
 ```
 
-Open the Vite URL shown in the terminal, normally `http://127.0.0.1:5173/`. Vite proxies `/api` to `http://127.0.0.1:7071`. Without the Functions host, the map still works but assessor analysis cannot load.
+Open the Vite URL shown in the terminal, normally `http://127.0.0.1:5173/`. Vite proxies `/api` to `http://127.0.0.1:7071`. Without the Functions host, the map still works but assessor analysis and 3D footprint lookups cannot load.
+
+The frontend includes a local override in [frontend/.env.local](frontend/.env.local) with `VITE_API_BASE_URL=/api`, which matches the Vite proxy for same-origin local development. For static deployments or a different hosting setup, set `VITE_API_BASE_URL` to the deployed Functions URL ending in `/api` before building.
 
 The API's local defaults are in [api/local.settings.json](api/local.settings.json). `TAX_YEAR` controls the treasurer tax-district request and defaults to `2025` when the setting is absent:
 
@@ -108,7 +118,7 @@ The frontend tests cover browser storage and assessor API responses, while the A
 1. Use the map's top-right search box to search for an address. The geocoder is restricted to the Larimer County extent.
 2. Select a result to center the map, place an active pin, and request the assessor analysis.
 3. Use the right-hand panels to toggle operational layers, inspect legends, and manage saved locations.
-4. Switch between Streets and Satellite basemaps. Enable **Sun Shadows (3D)** to inspect an estimated building mass and adjust the sun time.
+4. Switch between Streets and Satellite basemaps. Enable **Sun Shadows (3D)** to inspect the building mass and adjust the sun date/time. The map prefers real parcel footprints in the surrounding area when available, then falls back to the modeled estimate from assessor data.
 5. Enable **Imagery Timelapse** to choose a historical year or play the available imagery sequence. Changing the year pauses playback.
 6. Review the full-width assessor analysis below the map. Use **View table** inside a section when the raw upstream records are needed.
 
@@ -121,6 +131,7 @@ The app depends on the following public services:
 - ArcGIS World Geocoding Service for address suggestions.
 - ArcGIS feature and map services for FEMA floodplain, Fort Collins floodplain, bikeways, flood warnings, and historical imagery.
 - Larimer County assessor and treasurer APIs for property records.
+- Colorado geospatial services for nearby building footprints, proxied through the local API to avoid CORS issues during 3D shadow rendering.
 
 These services can change, rate-limit requests, or be temporarily unavailable. Map layers fail independently and assessor sections use partial-result handling. The app does not provide legal, surveying, tax, flood-risk, or valuation advice; county records and map visualizations should be independently verified.
 

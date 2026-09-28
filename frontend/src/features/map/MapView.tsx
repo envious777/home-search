@@ -99,6 +99,7 @@ export const MapViewPanel = ({ activeLayers, selected, saved, buildingInfo, onSe
 
     const map = new ArcGISMap({ basemap, ...(shadowsEnabled ? { ground: "world-elevation" } : {}) });
     let view: AnyView;
+
     if (shadowsEnabled) {
       const initialDate = sunDate(sunDateId, sunHour);
       view = new SceneView({
@@ -111,9 +112,11 @@ export const MapViewPanel = ({ activeLayers, selected, saved, buildingInfo, onSe
     } else {
       view = new MapView({ container: node.current, map, center: MAP_CENTER, zoom: MAP_INITIAL_ZOOM });
     }
+
     const savedLayer = new GraphicsLayer({ title: "Saved locations" });
     map.add(savedLayer);
     savedLayerRef.current = savedLayer;
+
     if (shadowsEnabled) {
       const contextBuildingLayer = new GraphicsLayer({
         title: "Nearby buildings (shadow context)",
@@ -133,6 +136,7 @@ export const MapViewPanel = ({ activeLayers, selected, saved, buildingInfo, onSe
       setNearbyFootprints([]);
       setFootprintsLoading(false);
     }
+
     const search = new Search({
       view,
       includeDefaultSources: false,
@@ -148,7 +152,9 @@ export const MapViewPanel = ({ activeLayers, selected, saved, buildingInfo, onSe
         }),
       ],
     });
+
     view.ui.add(search, "top-right");
+
     search.on("select-result", (event) => {
       const result = event.result;
       const point = result.feature.geometry as Point;
@@ -162,8 +168,10 @@ export const MapViewPanel = ({ activeLayers, selected, saved, buildingInfo, onSe
         attributes,
       });
     });
+    
     viewRef.current = view;
     setViewVersion((current) => current + 1);
+    
     return () => {
       view.destroy();
       viewRef.current = null;
@@ -179,16 +187,20 @@ export const MapViewPanel = ({ activeLayers, selected, saved, buildingInfo, onSe
   useEffect(() => {
     const view = viewRef.current;
     const layer = contextBuildingLayerRef.current;
+
     if (!shadowsEnabled || !(view instanceof SceneView) || !layer) {
       return;
     }
+
     if (!selected) {
       setFootprintsLoading(false);
       setNearbyFootprints([]);
       return;
     }
+
     let cancelled = false;
     setFootprintsLoading(true);
+
     // Fetched once per selection at building zoom; panning or zooming afterwards does not refetch, which keeps
     // the extent small and avoids rate limiting the upstream service.
     void reactiveUtils
@@ -211,6 +223,7 @@ export const MapViewPanel = ({ activeLayers, selected, saved, buildingInfo, onSe
           setFootprintsLoading(false);
         }
       });
+
     return () => {
       cancelled = true;
     };
@@ -218,15 +231,20 @@ export const MapViewPanel = ({ activeLayers, selected, saved, buildingInfo, onSe
 
   useEffect(() => {
     const layer = contextBuildingLayerRef.current;
+
     if (!layer) {
       return;
     }
+
     const selectedPoint = selected
       ? new Point({ longitude: selected.longitude, latitude: selected.latitude })
       : null;
+
     // The selected building is drawn by the effect below with its own color and real height.
     const selectedFootprint = selectedPoint ? findFootprintAtPoint(nearbyFootprints, selectedPoint) : null;
+    
     layer.removeAll();
+
     nearbyFootprints
       .filter((geometry) => geometry !== selectedFootprint)
       .forEach((geometry) => {
@@ -289,13 +307,16 @@ export const MapViewPanel = ({ activeLayers, selected, saved, buildingInfo, onSe
 
   useEffect(() => {
     const view = viewRef.current;
+    
     if (!view) {
       return;
     }
+
     const activeIds = new Set(activeLayers.map((layer) => layer.id));
     layerRefs.current.forEach((layer, id) => {
       layer.visible = activeIds.has(id);
     });
+
     activeLayers.forEach((definition) => {
       if (!layerRefs.current.has(definition.id)) {
         if (definition.pointTable || definition.imageLayers) {
@@ -378,6 +399,7 @@ export const MapViewPanel = ({ activeLayers, selected, saved, buildingInfo, onSe
             .catch((error: unknown) => console.error(`Unable to load ${definition.title}`, error));
           return;
         }
+
         const layer = new FeatureLayer({
           url: definition.url,
           visible: true,
@@ -388,11 +410,36 @@ export const MapViewPanel = ({ activeLayers, selected, saved, buildingInfo, onSe
             content: [{ type: "fields", fieldInfos: [{ fieldName: "*", label: "Attributes" }] }],
           },
         });
-        layerRefs.current.set(definition.id, layer);
-        view.map?.add(layer);
+
+        if (!definition.extraFeatureLayers?.length) {
+          layerRefs.current.set(definition.id, layer);
+          view.map?.add(layer);
+          return;
+        }
+
+        const extraLayers = definition.extraFeatureLayers.map(
+          (extra) =>
+            new FeatureLayer({
+              url: extra.url,
+              visible: true,
+              outFields: ["*"],
+              title: extra.title,
+              definitionExpression: extra.definitionExpression,
+              popupTemplate: {
+                title: extra.title,
+                content: [{ type: "fields", fieldInfos: [{ fieldName: "*", label: "Attributes" }] }],
+              },
+            }),
+        );
+
+        const group = new GroupLayer({ title: definition.title, visible: true, layers: [...extraLayers, layer] });
+        layerRefs.current.set(definition.id, group);
+        view.map?.add(group);
       }
     });
+
     const savedLayer = savedLayerRef.current;
+
     if (savedLayer && view.map) {
       view.map.reorder(savedLayer, view.map.layers.length - 1);
     }
@@ -400,9 +447,11 @@ export const MapViewPanel = ({ activeLayers, selected, saved, buildingInfo, onSe
 
   useEffect(() => {
     const view = viewRef.current;
+
     if (!view?.map) {
       return;
     }
+
     view.map.basemap = basemap;
     const opacity = shadowsEnabled && basemap === "satellite" ? SHADOW_IMAGERY_OPACITY : 1;
     const map = view.map;
@@ -419,22 +468,28 @@ export const MapViewPanel = ({ activeLayers, selected, saved, buildingInfo, onSe
 
   useEffect(() => {
     const view = viewRef.current;
+
     if (!view?.map) {
       return;
     }
+
     const layers = imageryLayerRefs.current;
+
     if (!timelapseEnabled) {
       layers.forEach((layer) => (layer.visible = false));
       return;
     }
+
     // Larimer caches tiles in State Plane (2876), so use dynamic export to let the server reproject to the view.
     const { url } = imageryForYear(timelapseYear);
     let active = layers.get(url);
+
     if (!active) {
       active = new MapImageLayer({ url, title: "Historical imagery", imageFormat: "jpg" });
       layers.set(url, active);
       view.map.add(active, 0);
     }
+
     active.visible = true;
     active.opacity = shadowsEnabled ? SHADOW_IMAGERY_OPACITY : 1;
     view.map.reorder(active, 0);
@@ -455,6 +510,7 @@ export const MapViewPanel = ({ activeLayers, selected, saved, buildingInfo, onSe
         });
       })
       .catch((error: unknown) => console.error("Unable to load historical imagery", error));
+
     return () => {
       cancelled = true;
     };
@@ -464,17 +520,21 @@ export const MapViewPanel = ({ activeLayers, selected, saved, buildingInfo, onSe
     if (!timelapseEnabled || !timelapsePlaying) {
       return;
     }
+
     const timer = window.setInterval(() => {
       setTimelapseYear((current) => imageryYears.find((year) => year > current) ?? imageryYears[0]);
     }, TIMELAPSE_FRAME_MS);
+
     return () => window.clearInterval(timer);
   }, [timelapseEnabled, timelapsePlaying]);
 
   useEffect(() => {
     const layer = savedLayerRef.current;
+
     if (!layer) {
       return;
     }
+
     const isScene = viewRef.current instanceof SceneView;
     layer.removeAll();
     saved.forEach((item) => {
@@ -498,9 +558,11 @@ export const MapViewPanel = ({ activeLayers, selected, saved, buildingInfo, onSe
 
   useEffect(() => {
     const view = viewRef.current;
+    
     if (!view || !selected) {
       return;
     }
+
     view.graphics.removeAll();
     const point = new Point({ longitude: selected.longitude, latitude: selected.latitude });
     view.graphics.add(
@@ -529,9 +591,11 @@ export const MapViewPanel = ({ activeLayers, selected, saved, buildingInfo, onSe
       cancelled = true;
     };
   }, [selected, viewVersion]);
+  
   const sunTimeLabel = new Date(2000, 0, 1, sunHour).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
   const shownImageryYear = imageryForYear(timelapseYear).year;
   const shadowBoost = shadowsEnabled && (basemap === "satellite" || timelapseEnabled);
+
   return (
     <div className="map-shell">
       <div

@@ -7,6 +7,7 @@ export interface SelectedLocation {
   attributes: Record<string, unknown>;
   savedAt: string;
 }
+
 export interface LayerDefinition {
   id: string;
   title: string;
@@ -18,6 +19,7 @@ export interface LayerDefinition {
     entries: { label: string; color: string; shape: "area" | "drop" | "circle" }[];
   }[];
   imageLayers?: { title: string; url: string; sublayerIds: number[] }[];
+  extraFeatureLayers?: { title: string; url: string; definitionExpression?: string }[];
   pointTable?: {
     latitudeField: string;
     longitudeField: string;
@@ -26,10 +28,12 @@ export interface LayerDefinition {
     popupFields: { fieldName: string; label: string }[];
   };
 }
+
 export interface BuildingInfo {
   squareFeet: number;
   stories: number;
 }
+
 export interface AssessorAnalysis {
   address: { fromAddrNum: string; toAddrNum: string; address: string; city: string; zip?: string };
   accountno: string | null;
@@ -37,3 +41,5 @@ export interface AssessorAnalysis {
   errors: string[];
   partial: boolean;
 }
+
+export type Theme = "light" | "dark";
