@@ -34,7 +34,9 @@ export const fetchBuildingFootprints = async (bbox: BBox): Promise<unknown> => {
       },
     });
     if (!response.ok) {
-      throw new Error(`upstream status ${response.status}`);
+      throw new Error(
+        `upstream status ${response.status} (server: ${response.headers.get("server") ?? "unknown"}, content-type: ${response.headers.get("content-type") ?? "unknown"})`,
+      );
     }
     return await response.json();
   } finally {
