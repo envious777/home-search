@@ -64,6 +64,8 @@ export const FEET_PER_DEGREE_LATITUDE = 364_000;
 export const BUILDING_FOOTPRINTS_API_URL = "/api/building-footprints";
 // Below this zoom the extent covers too many footprints, which risks rate limiting the WMS/WFS server.
 export const MIN_FOOTPRINT_ZOOM = 19;
+// SceneView derives zoom from camera altitude, so goTo(SELECTED_ZOOM) settles slightly under the integer level.
+export const FOOTPRINT_ZOOM_TOLERANCE = 0.5;
 // Neighboring footprints only cast shadows; their real height is unknown so a modest default is used.
 export const CONTEXT_BUILDING_HEIGHT_FT = 15;
 export const CONTEXT_BUILDING_COLOR = [130, 130, 130, 0.35];

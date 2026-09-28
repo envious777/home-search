@@ -24,6 +24,7 @@ import {
   CONTEXT_BUILDING_COLOR,
   CONTEXT_BUILDING_HEIGHT_FT,
   FEET_TO_METERS,
+  FOOTPRINT_ZOOM_TOLERANCE,
   GEOCODER_URL,
   layers,
   MAP_CENTER,
@@ -191,7 +192,12 @@ export const MapViewPanel = ({ activeLayers, selected, saved, buildingInfo, onSe
     // Fetched once per selection at building zoom; panning or zooming afterwards does not refetch, which keeps
     // the extent small and avoids rate limiting the upstream service.
     void reactiveUtils
-      .whenOnce(() => view.stationary && (view.zoom ?? 0) >= MIN_FOOTPRINT_ZOOM && Boolean(view.extent))
+      .whenOnce(
+        () =>
+          view.stationary &&
+          (view.zoom ?? 0) >= MIN_FOOTPRINT_ZOOM - FOOTPRINT_ZOOM_TOLERANCE &&
+          Boolean(view.extent),
+      )
       .then(() => (cancelled ? [] : fetchBuildingFootprints(view.extent)))
       .then((footprints) => {
         if (cancelled || contextBuildingLayerRef.current !== layer) {
