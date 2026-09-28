@@ -13,7 +13,10 @@ export const buildingFootprints = async (request: HttpRequest, context: Invocati
     return { status: 200, jsonBody: body };
   } catch (error) {
     context.error("Building footprint proxy failed", error);
-    return { status: 504, jsonBody: { error: "The building footprint service did not respond in time. Please retry." } };
+    const timedOut = error instanceof Error && error.name === "AbortError";
+    return timedOut
+      ? { status: 504, jsonBody: { error: "The building footprint service did not respond in time. Please retry." } }
+      : { status: 502, jsonBody: { error: "The building footprint service is unavailable. Please retry." } };
   }
 }
 app.http("buildingFootprints", {
