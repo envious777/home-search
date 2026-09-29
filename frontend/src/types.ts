@@ -32,6 +32,7 @@ export interface LayerDefinition {
 export interface BuildingInfo {
   squareFeet: number;
   stories: number;
+  rooftype: string | null;
 }
 
 export interface AssessorAnalysis {

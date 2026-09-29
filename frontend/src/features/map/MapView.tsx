@@ -12,6 +12,8 @@ import MapImageLayer from "@arcgis/core/layers/MapImageLayer";
 import * as reactiveUtils from "@arcgis/core/core/reactiveUtils";
 import PolygonSymbol3D from "@arcgis/core/symbols/PolygonSymbol3D";
 import ExtrudeSymbol3DLayer from "@arcgis/core/symbols/ExtrudeSymbol3DLayer";
+import MeshSymbol3D from "@arcgis/core/symbols/MeshSymbol3D";
+import FillSymbol3DLayer from "@arcgis/core/symbols/FillSymbol3DLayer";
 import SunLighting from "@arcgis/core/views/3d/environment/SunLighting";
 import LocatorSearchSource from "@arcgis/core/widgets/Search/LocatorSearchSource";
 import Search from "@arcgis/core/widgets/Search";
@@ -43,6 +45,7 @@ import {
 import {
   buildingFootprint,
   buildingHeightMeters,
+  buildingRoof,
   fetchBuildingFootprints,
   findFootprintAtPoint,
   imageryForYear,
@@ -92,7 +95,7 @@ export const MapViewPanel = ({ activeLayers, selected, saved, buildingInfo, onSe
   const layerRefs = useRef(new Map<string, FeatureLayer | GroupLayer>());
   const onSelectRef = useRef(onSelect);
   onSelectRef.current = onSelect;
-  const shadowDisplay = shadowDisplayForDate(sunDate(sunDateId, sunHour));
+  const shadowDisplay = shadowDisplayForDate(sunDate(sunDateId, sunHour), selected?.latitude ?? MAP_CENTER[1]);
 
   useEffect(() => {
     if (!node.current) {
@@ -250,13 +253,15 @@ export const MapViewPanel = ({ activeLayers, selected, saved, buildingInfo, onSe
     nearbyFootprints
       .filter((footprint) => footprint !== selectedFootprint)
       .forEach((footprint) => {
+        const heightMeters = footprint.heightMeters ?? CONTEXT_BUILDING_HEIGHT_FT * FEET_TO_METERS;
+        const roof = buildingRoof(footprint.geometry, heightMeters, footprint.rooftype, CONTEXT_BUILDING_COLOR);
         layer.add(
           new Graphic({
             geometry: footprint.geometry,
             symbol: new PolygonSymbol3D({
               symbolLayers: [
                 new ExtrudeSymbol3DLayer({
-                  size: (footprint.heightMeters ?? CONTEXT_BUILDING_HEIGHT_FT * FEET_TO_METERS),
+                  size: roof?.eave ?? heightMeters,
                   castShadows: true,
                   material: { color: CONTEXT_BUILDING_COLOR },
                 }),
@@ -264,6 +269,12 @@ export const MapViewPanel = ({ activeLayers, selected, saved, buildingInfo, onSe
             }),
           }),
         );
+        if (roof) {
+          layer.add(new Graphic({
+            geometry: roof.geometry,
+            symbol: new MeshSymbol3D({ symbolLayers: [new FillSymbol3DLayer({ castShadows: true })] }),
+          }));
+        }
       });
   }, [nearbyFootprints, selected, viewVersion]);
 
@@ -291,13 +302,14 @@ export const MapViewPanel = ({ activeLayers, selected, saved, buildingInfo, onSe
     const selectedPoint = new Point({ longitude: selected.longitude, latitude: selected.latitude });
     const footprint = findFootprintAtPoint(nearbyFootprints, selectedPoint)?.geometry ?? buildingFootprint(selected, buildingInfo);
     const heightMeters = buildingHeightMeters(buildingInfo);
+    const roof = buildingRoof(footprint, heightMeters, buildingInfo.rooftype);
     layer.add(
       new Graphic({
         geometry: footprint,
         symbol: new PolygonSymbol3D({
           symbolLayers: [
             new ExtrudeSymbol3DLayer({
-              size: heightMeters,
+              size: roof?.eave ?? heightMeters,
               castShadows: true,
               material: { color: BUILDING_COLOR },
             }),
@@ -305,6 +317,12 @@ export const MapViewPanel = ({ activeLayers, selected, saved, buildingInfo, onSe
         }),
       }),
     );
+    if (roof) {
+      layer.add(new Graphic({
+        geometry: roof.geometry,
+        symbol: new MeshSymbol3D({ symbolLayers: [new FillSymbol3DLayer({ castShadows: true })] }),
+      }));
+    }
   }, [selected, buildingInfo, nearbyFootprints, footprintsLoading, viewVersion]);
 
   useEffect(() => {

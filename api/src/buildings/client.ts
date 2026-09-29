@@ -26,11 +26,12 @@ export interface IndexedFootprint {
   geometry: PolygonGeometry;
   bounds: BBox;
   stories?: number;
+  rooftype?: string;
 }
 
 export interface BuildingFootprintsCollection {
   type: "FeatureCollection";
-  features: { type: "Feature"; properties: { stories?: number }; geometry: PolygonGeometry }[];
+  features: { type: "Feature"; properties: { stories?: number; rooftype?: string }; geometry: PolygonGeometry }[];
 }
 
 interface ParcelGeometry {
@@ -78,7 +79,10 @@ export const filterFootprintsByBBox = (
     ) {
       features.push({
         type: "Feature",
-        properties: footprint.stories === undefined ? {} : { stories: footprint.stories },
+        properties: {
+          ...(footprint.stories === undefined ? {} : { stories: footprint.stories }),
+          ...(footprint.rooftype === undefined ? {} : { rooftype: footprint.rooftype }),
+        },
         geometry: footprint.geometry,
       });
       if (features.length === FETCH_LIMIT) {
@@ -129,15 +133,20 @@ const readParcelRecords = (payload: unknown): ParcelRecord[] => {
   });
 };
 
-const readStories = (payload: unknown): number | undefined => {
+const readImprovement = (payload: unknown): { stories?: number; rooftype?: string } => {
   const records = asRecord(payload)?.records;
   if (!Array.isArray(records)) {
-    return undefined;
+    return {};
   }
-  const stories = records
-    .map((record) => Number(asRecord(record)?.stories))
-    .find((value) => Number.isFinite(value) && value > 0);
-  return stories;
+  const improvements = records.map(asRecord);
+  const record = improvements.find((entry) => Number(entry?.stories) > 0 && Number.isFinite(Number(entry?.stories)))
+    ?? improvements.find((entry) => typeof entry?.rooftype === "string" && entry.rooftype.trim());
+  const stories = Number(record?.stories);
+  const rooftype = typeof record?.rooftype === "string" ? record.rooftype.trim() : "";
+  return {
+    ...(Number.isFinite(stories) && stories > 0 ? { stories } : {}),
+    ...(rooftype ? { rooftype } : {}),
+  };
 };
 
 const pointInRing = (longitude: number, latitude: number, ring: unknown): boolean => {
@@ -212,16 +221,16 @@ const queryParcels = async (bbox: BBox): Promise<ParcelRecord[]> => {
   return readParcelRecords(await fetchJson(`${PARCELS_URL}?${params}`));
 };
 
-const loadStoriesByAccount = async (accounts: string[]): Promise<Map<string, number>> => {
-  const storiesByAccount = new Map<string, number>();
+const loadImprovementByAccount = async (accounts: string[]): Promise<Map<string, { stories?: number; rooftype?: string }>> => {
+  const improvementByAccount = new Map<string, { stories?: number; rooftype?: string }>();
   let nextIndex = 0;
   const worker = async (): Promise<void> => {
     while (nextIndex < accounts.length) {
       const account = accounts[nextIndex++];
       try {
-        const stories = readStories(await fetchJson(sectionUrl("improvement", account, "")));
-        if (stories !== undefined) {
-          storiesByAccount.set(account, stories);
+        const improvement = readImprovement(await fetchJson(sectionUrl("improvement", account, "")));
+        if (improvement.stories !== undefined || improvement.rooftype !== undefined) {
+          improvementByAccount.set(account, improvement);
         }
       } catch {
         // A missing or unavailable improvement record should not hide all nearby footprints.
@@ -229,7 +238,7 @@ const loadStoriesByAccount = async (accounts: string[]): Promise<Map<string, num
     }
   };
   await Promise.all(Array.from({ length: Math.min(ASSESSOR_CONCURRENCY, accounts.length) }, worker));
-  return storiesByAccount;
+  return improvementByAccount;
 };
 
 const enrichStories = async (footprints: IndexedFootprint[], bbox: BBox, context?: InvocationContext): Promise<void> => {
@@ -237,7 +246,7 @@ const enrichStories = async (footprints: IndexedFootprint[], bbox: BBox, context
   context?.log?.("Queried parcel layer", { parcelCount: parcels.length, footprintCount: footprints.length });
 
   const accounts = [...new Set(parcels.map((parcel) => parcel.accountno))];
-  const storiesByAccount = await loadStoriesByAccount(accounts);
+  const improvementByAccount = await loadImprovementByAccount(accounts);
   let matchedCount = 0;
 
   for (const footprint of footprints) {
@@ -253,15 +262,16 @@ const enrichStories = async (footprints: IndexedFootprint[], bbox: BBox, context
           footprint.bounds.ymin <= bounds.ymax &&
           footprint.bounds.ymax >= bounds.ymin),
     );
-    const stories = parcel ? storiesByAccount.get(parcel.accountno) : undefined;
-    if (stories !== undefined) {
-      footprint.stories = stories;
+    const improvement = parcel ? improvementByAccount.get(parcel.accountno) : undefined;
+    if (improvement) {
+      if (improvement.stories !== undefined) footprint.stories = improvement.stories;
+      if (improvement.rooftype !== undefined) footprint.rooftype = improvement.rooftype;
       matchedCount += 1;
     }
   }
   context?.log?.("Enriched building footprints", {
     accountCount: accounts.length,
-    storyAccountCount: storiesByAccount.size,
+    storyAccountCount: improvementByAccount.size,
     matchedCount,
   });
 };

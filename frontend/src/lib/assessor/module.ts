@@ -18,7 +18,7 @@ export const asTable = (data: unknown): Table | null => {
 
 export const extractBuildingInfo = (analysis: AssessorAnalysis | null): BuildingInfo | null => {
   const data = analysis?.sections.improvement?.data as
-    { records?: Array<{ sf?: string | null; stories?: string | null }> } | undefined;
+    { records?: Array<{ sf?: string | null; stories?: string | null; rooftype?: string | null }> } | undefined;
   const record = data?.records?.[0];
   const squareFeet = Number(record?.sf);
   const stories = Number(record?.stories);
@@ -26,7 +26,7 @@ export const extractBuildingInfo = (analysis: AssessorAnalysis | null): Building
     return null;
   }
 
-  return { squareFeet, stories };
+  return { squareFeet, stories, rooftype: record?.rooftype?.trim() || null };
 }
 
 export const num = (value: string | null | undefined) => {

@@ -1,10 +1,12 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   fetchBuildingFootprints,
   filterFootprintsByBBox,
   geometryBounds,
   type IndexedFootprint,
 } from "./client.js";
+
+afterEach(() => vi.unstubAllGlobals());
 
 describe("local building footprint data", () => {
   it("computes bounds for polygon and multipolygon geometries", () => {
@@ -53,5 +55,20 @@ describe("local building footprint data", () => {
     expect(firstResponse.features.length).toBeGreaterThan(0);
     expect(firstResponse.features.length).toBeLessThanOrEqual(1000);
     expect(secondResponse).toEqual(firstResponse);
+  });
+
+  it("includes the improvement roof type with stories on matched footprints", async () => {
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => ({
+      ok: true,
+      json: async () => url.includes("/Parcels/")
+        ? { features: [{ attributes: { SCHEDNUM: "123" }, geometry: { rings: [[
+          [-105.92, 40.84], [-105.88, 40.84], [-105.88, 40.88], [-105.92, 40.88], [-105.92, 40.84],
+        ]] } }] }
+        : { records: [{ stories: "", rooftype: "" }, { stories: "2", rooftype: " Gable " }] },
+    })));
+
+    const response = await fetchBuildingFootprints({ xmin: -105.91, ymin: 40.85, xmax: -105.89, ymax: 40.87 });
+    expect(response.features.length).toBeGreaterThan(0);
+    expect(response.features[0].properties).toEqual({ stories: 2, rooftype: "Gable" });
   });
 });
