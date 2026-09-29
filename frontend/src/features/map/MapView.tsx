@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import ArcGISMap from "@arcgis/core/Map";
 import MapView from "@arcgis/core/views/MapView";
 import SceneView from "@arcgis/core/views/SceneView";
@@ -34,7 +34,6 @@ import {
   MIN_SUN_HOUR,
   SAVED_PIN_COLOR,
   SELECTED_ZOOM,
-  SHADOW_IMAGERY_OPACITY,
   SUN_DATES,
   TIMELAPSE_END_YEAR,
   TIMELAPSE_FRAME_MS,
@@ -49,8 +48,10 @@ import {
   imageryForYear,
   larimerCountyExtent,
   pinSymbol,
+  shadowDisplayForDate,
   sunDate,
 } from "../../lib/map/module";
+import type { BuildingFootprint } from "../../lib/map/module";
 
 type MapLocation = { latitude: number; longitude: number; canonicalAddress: string; city?: string };
 type AnyView = MapView | SceneView;
@@ -78,7 +79,7 @@ export const MapViewPanel = ({ activeLayers, selected, saved, buildingInfo, onSe
   const [timelapseEnabled, setTimelapseEnabled] = useState(false);
   const [timelapseYear, setTimelapseYear] = useState(TIMELAPSE_END_YEAR);
   const [timelapsePlaying, setTimelapsePlaying] = useState(false);
-  const [nearbyFootprints, setNearbyFootprints] = useState<Polygon[]>([]);
+  const [nearbyFootprints, setNearbyFootprints] = useState<BuildingFootprint[]>([]);
   const [footprintsLoading, setFootprintsLoading] = useState(false);
   const [noteOpen, setNoteOpen] = useState(false);
   const [noteHovered, setNoteHovered] = useState(false);
@@ -91,6 +92,7 @@ export const MapViewPanel = ({ activeLayers, selected, saved, buildingInfo, onSe
   const layerRefs = useRef(new Map<string, FeatureLayer | GroupLayer>());
   const onSelectRef = useRef(onSelect);
   onSelectRef.current = onSelect;
+  const shadowDisplay = shadowDisplayForDate(sunDate(sunDateId, sunHour));
 
   useEffect(() => {
     if (!node.current) {
@@ -246,15 +248,15 @@ export const MapViewPanel = ({ activeLayers, selected, saved, buildingInfo, onSe
     layer.removeAll();
 
     nearbyFootprints
-      .filter((geometry) => geometry !== selectedFootprint)
-      .forEach((geometry) => {
+      .filter((footprint) => footprint !== selectedFootprint)
+      .forEach((footprint) => {
         layer.add(
           new Graphic({
-            geometry,
+            geometry: footprint.geometry,
             symbol: new PolygonSymbol3D({
               symbolLayers: [
                 new ExtrudeSymbol3DLayer({
-                  size: CONTEXT_BUILDING_HEIGHT_FT * FEET_TO_METERS,
+                  size: (footprint.heightMeters ?? CONTEXT_BUILDING_HEIGHT_FT * FEET_TO_METERS),
                   castShadows: true,
                   material: { color: CONTEXT_BUILDING_COLOR },
                 }),
@@ -287,7 +289,7 @@ export const MapViewPanel = ({ activeLayers, selected, saved, buildingInfo, onSe
     // Prefer the real parcel footprint from GIS data when the selected point falls inside one; otherwise fall
     // back to a rectangular approximation derived from assessor square footage and stories.
     const selectedPoint = new Point({ longitude: selected.longitude, latitude: selected.latitude });
-    const footprint = findFootprintAtPoint(nearbyFootprints, selectedPoint) ?? buildingFootprint(selected, buildingInfo);
+    const footprint = findFootprintAtPoint(nearbyFootprints, selectedPoint)?.geometry ?? buildingFootprint(selected, buildingInfo);
     const heightMeters = buildingHeightMeters(buildingInfo);
     layer.add(
       new Graphic({
@@ -453,7 +455,7 @@ export const MapViewPanel = ({ activeLayers, selected, saved, buildingInfo, onSe
     }
 
     view.map.basemap = basemap;
-    const opacity = shadowsEnabled && basemap === "satellite" ? SHADOW_IMAGERY_OPACITY : 1;
+    const opacity = shadowsEnabled && basemap === "satellite" ? shadowDisplay.imageryOpacity : 1;
     const map = view.map;
     void map.basemap
       ?.loadAll()
@@ -464,7 +466,7 @@ export const MapViewPanel = ({ activeLayers, selected, saved, buildingInfo, onSe
         map.basemap?.baseLayers.forEach((layer) => (layer.opacity = opacity));
       })
       .catch((error: unknown) => console.error("Unable to load the basemap", error));
-  }, [basemap, shadowsEnabled, viewVersion]);
+  }, [basemap, shadowsEnabled, shadowDisplay.imageryOpacity, viewVersion]);
 
   useEffect(() => {
     const view = viewRef.current;
@@ -491,7 +493,7 @@ export const MapViewPanel = ({ activeLayers, selected, saved, buildingInfo, onSe
     }
 
     active.visible = true;
-    active.opacity = shadowsEnabled ? SHADOW_IMAGERY_OPACITY : 1;
+    active.opacity = shadowsEnabled ? shadowDisplay.imageryOpacity : 1;
     view.map.reorder(active, 0);
     const target = active;
     let cancelled = false;
@@ -514,7 +516,7 @@ export const MapViewPanel = ({ activeLayers, selected, saved, buildingInfo, onSe
     return () => {
       cancelled = true;
     };
-  }, [timelapseEnabled, timelapseYear, shadowsEnabled, viewVersion]);
+  }, [timelapseEnabled, timelapseYear, shadowsEnabled, shadowDisplay.imageryOpacity, viewVersion]);
 
   useEffect(() => {
     if (!timelapseEnabled || !timelapsePlaying) {
@@ -595,12 +597,19 @@ export const MapViewPanel = ({ activeLayers, selected, saved, buildingInfo, onSe
   const sunTimeLabel = new Date(2000, 0, 1, sunHour).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
   const shownImageryYear = imageryForYear(timelapseYear).year;
   const shadowBoost = shadowsEnabled && (basemap === "satellite" || timelapseEnabled);
+  const shadowStyle = shadowBoost
+    ? ({
+        "--shadow-brightness": shadowDisplay.brightness,
+        "--shadow-contrast": shadowDisplay.contrast,
+      } as CSSProperties)
+    : undefined;
 
   return (
     <div className="map-shell">
       <div
         ref={node}
         className={shadowBoost ? "map-canvas shadow-boost" : "map-canvas"}
+        style={shadowStyle}
         role="application"
         aria-label="Larimer County map"
       />

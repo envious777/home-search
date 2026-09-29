@@ -12,7 +12,6 @@ Home Search is a Larimer County property exploration tool. It combines an ArcGIS
 - Supports light and dark themes, persisted in browser `localStorage`.
 - Provides optional 3D sun shadows. The selected building is rendered as an estimated extrusion based on assessor square footage and story count, and nearby real parcel footprints are used when available to improve the shadow context.
 - Provides a historical imagery timelapse from 1999 through 2025. If an exact year is not published, the nearest earlier Larimer County imagery service is shown.
-- Fetches nearby building footprints through the local API proxy so the 3D experience can use real parcel geometry without CORS issues.
 
 ## Architecture
 

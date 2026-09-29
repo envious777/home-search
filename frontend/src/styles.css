@@ -162,7 +162,7 @@ h1 {
 /* Shadows wash out over bright aerial imagery; the SDK has no shadow-intensity knob, so darken the render itself.
    Only the WebGL canvas is filtered so the map widgets stay at full brightness. */
 .map-canvas.shadow-boost canvas {
-  filter: brightness(0.82) contrast(1.3);
+  filter: brightness(var(--shadow-brightness, 0.9)) contrast(var(--shadow-contrast, 1.6));
 }
 .map-note {
   position: absolute;

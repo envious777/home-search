@@ -17,6 +17,12 @@ import {
   LARIMER_COUNTY_BOUNDS,
   MAP_PIN_OUTLINE,
   MAP_PIN_PATH,
+  MAX_SHADOW_BRIGHTNESS,
+  MAX_SHADOW_CONTRAST,
+  MAX_SHADOW_IMAGERY_OPACITY,
+  MIN_SHADOW_BRIGHTNESS,
+  MIN_SHADOW_CONTRAST,
+  MIN_SHADOW_IMAGERY_OPACITY,
   SUN_DATES,
 } from "./constants";
 import { apiBase } from "../global";
@@ -40,6 +46,27 @@ export const sunDate = (sunDateId: string, hour: number): Date => {
   date.setHours(hour, 0, 0, 0);
   return date;
 }
+
+export const shadowDisplayForDate = (date: Date): { brightness: number; contrast: number; imageryOpacity: number } => {
+  const startOfYear = new Date(date.getFullYear(), 0, 0);
+  const dayOfYear = Math.floor((date.getTime() - startOfYear.getTime()) / 86_400_000);
+  const latitudeRadians = (40.5853 * Math.PI) / 180;
+  const declinationRadians =
+    ((-23.44 * Math.cos((2 * Math.PI * (dayOfYear + 10)) / 365)) * Math.PI) / 180;
+  const hourAngleRadians = ((15 * (date.getHours() - 12)) * Math.PI) / 180;
+  const altitude = Math.asin(
+    Math.sin(latitudeRadians) * Math.sin(declinationRadians) +
+      Math.cos(latitudeRadians) * Math.cos(declinationRadians) * Math.cos(hourAngleRadians),
+  );
+  const intensity = Math.max(0, Math.min(1, Math.sin(altitude)));
+
+  return {
+    brightness: MAX_SHADOW_BRIGHTNESS - intensity * (MAX_SHADOW_BRIGHTNESS - MIN_SHADOW_BRIGHTNESS),
+    contrast: MIN_SHADOW_CONTRAST + intensity * (MAX_SHADOW_CONTRAST - MIN_SHADOW_CONTRAST),
+    imageryOpacity:
+      MAX_SHADOW_IMAGERY_OPACITY - intensity * (MAX_SHADOW_IMAGERY_OPACITY - MIN_SHADOW_IMAGERY_OPACITY),
+  };
+};
 
 const pinImage = (color: string): string => {
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="${MAP_PIN_PATH}" fill="${color}" stroke="${MAP_PIN_OUTLINE}" stroke-width="1"/></svg>`;
@@ -93,6 +120,11 @@ interface GeoJsonPolygonGeometry {
   coordinates: number[][][] | number[][][][];
 }
 
+export interface BuildingFootprint {
+  geometry: Polygon;
+  heightMeters: number | null;
+}
+
 export const geojsonToPolygon = (geometry: GeoJsonPolygonGeometry): Polygon => {
   // Esri Polygon.rings accepts multiple exterior rings directly (multipart), so MultiPolygon parts can be flattened.
   const rings =
@@ -102,7 +134,7 @@ export const geojsonToPolygon = (geometry: GeoJsonPolygonGeometry): Polygon => {
   return new Polygon({ rings, spatialReference: { wkid: 4326 } });
 }
 
-export const fetchBuildingFootprints = async (extent: Extent): Promise<Polygon[]> => {
+export const fetchBuildingFootprints = async (extent: Extent): Promise<BuildingFootprint[]> => {
   const params = new URLSearchParams({
     xmin: String(extent.xmin),
     ymin: String(extent.ymin),
@@ -114,10 +146,18 @@ export const fetchBuildingFootprints = async (extent: Extent): Promise<Polygon[]
     throw new Error(`Building footprint request failed (${response.status})`);
   }
   const collection = await response.json();
-  const features: { geometry: GeoJsonPolygonGeometry | null }[] = collection.features ?? [];
-  return features.filter((feature) => feature.geometry).map((feature) => geojsonToPolygon(feature.geometry!));
+  const features: { geometry: GeoJsonPolygonGeometry | null; properties?: { stories?: number } }[] = collection.features ?? [];
+  return features
+    .filter((feature) => feature.geometry)
+    .map((feature) => ({
+      geometry: geojsonToPolygon(feature.geometry!),
+      heightMeters:
+        typeof feature.properties?.stories === "number"
+          ? feature.properties.stories * AVG_STORY_HEIGHT_FT * FEET_TO_METERS
+          : null,
+    }));
 }
 
-export const findFootprintAtPoint = (footprints: Polygon[], point: Point): Polygon | null => {
-  return footprints.find((footprint) => geometryEngine.contains(footprint, point)) ?? null;
+export const findFootprintAtPoint = (footprints: BuildingFootprint[], point: Point): BuildingFootprint | null => {
+  return footprints.find((footprint) => geometryEngine.contains(footprint.geometry, point)) ?? null;
 }
