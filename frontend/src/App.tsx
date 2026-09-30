@@ -13,7 +13,6 @@ import {
   DeleteRegular,
   HeartRegular,
   MapRegular,
-  SearchRegular,
   WeatherMoonRegular,
   WeatherSunnyRegular,
 } from "@fluentui/react-icons";
@@ -183,6 +182,7 @@ const App = () => {
                   appearance="primary"
                   icon={<ArrowDownloadRegular />}
                   onClick={() => setSaved(saveLocation(selected))}
+                  className="save-button"
                 >
                   Save selected location
                 </Button>

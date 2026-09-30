@@ -112,6 +112,7 @@ export const MapViewPanel = ({ activeLayers, selected, saved, buildingInfo, onSe
         map,
         center: MAP_CENTER,
         zoom: MAP_INITIAL_ZOOM,
+        navigation: { momentumEnabled: false },
         environment: { lighting: new SunLighting({ date: initialDate, directShadowsEnabled: true }) },
       });
     } else {
@@ -626,7 +627,7 @@ export const MapViewPanel = ({ activeLayers, selected, saved, buildingInfo, onSe
     <div className="map-shell">
       <div
         ref={node}
-        className={shadowBoost ? "map-canvas shadow-boost" : "map-canvas"}
+        className={`map-canvas${shadowsEnabled ? " scene-canvas" : ""}${shadowBoost ? " shadow-boost" : ""}`}
         style={shadowStyle}
         role="application"
         aria-label="Larimer County map"
@@ -647,88 +648,90 @@ export const MapViewPanel = ({ activeLayers, selected, saved, buildingInfo, onSe
           Satellite
         </button>
       </div>
-      <div className="sun-control" role="group" aria-label="Sun Shadows">
-        <label htmlFor="shadow-toggle">
-          <input
-            id="shadow-toggle"
-            type="checkbox"
-            checked={shadowsEnabled}
-            onChange={(event) => setShadowsEnabled(event.target.checked)}
-          />{" "}
-          Sun Shadows (3D)
-        </label>
-        {shadowsEnabled && (
-          <>
-            <select
-              aria-label="Time of year"
-              className="sun-date"
-              value={sunDateId}
-              onChange={(event) => setSunDateId(event.target.value)}
-            >
-              {SUN_DATES.map((option) => (
-                <option key={option.id} value={option.id}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-            <span className="sun-time">{sunTimeLabel}</span>
+      <div className="map-controls">
+        <div className="sun-control" role="group" aria-label="Sun Shadows">
+          <label htmlFor="shadow-toggle">
             <input
-              aria-label="Sun time"
-              type="range"
-              min={MIN_SUN_HOUR}
-              max={MAX_SUN_HOUR}
-              step={1}
-              value={sunHour}
-              onChange={(event) => setSunHour(Number(event.target.value))}
-            />
-          </>
-        )}
-      </div>
-      <div className="timelapse-control" role="group" aria-label="Imagery Timelapse">
-        <label htmlFor="timelapse-toggle">
-          <input
-            id="timelapse-toggle"
-            type="checkbox"
-            checked={timelapseEnabled}
-            onChange={(event) => {
-              setTimelapseEnabled(event.target.checked);
-              if (!event.target.checked) {
-                setTimelapsePlaying(false);
-              }
-            }}
-          />{" "}
-          Imagery Timelapse
-        </label>
-        {timelapseEnabled && (
-          <>
-            <button
-              type="button"
-              className="timelapse-play"
-              aria-label={timelapsePlaying ? "Pause timelapse" : "Play timelapse"}
-              onClick={() => setTimelapsePlaying((current) => !current)}
-            >
-              {timelapsePlaying ? "Pause" : "Play"}
-            </button>
+              id="shadow-toggle"
+              type="checkbox"
+              checked={shadowsEnabled}
+              onChange={(event) => setShadowsEnabled(event.target.checked)}
+            />{" "}
+            Sun Shadows (3D)
+          </label>
+          {shadowsEnabled && (
+            <>
+              <select
+                aria-label="Time of year"
+                className="sun-date"
+                value={sunDateId}
+                onChange={(event) => setSunDateId(event.target.value)}
+              >
+                {SUN_DATES.map((option) => (
+                  <option key={option.id} value={option.id}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+              <span className="sun-time">{sunTimeLabel}</span>
+              <input
+                aria-label="Sun time"
+                type="range"
+                min={MIN_SUN_HOUR}
+                max={MAX_SUN_HOUR}
+                step={1}
+                value={sunHour}
+                onChange={(event) => setSunHour(Number(event.target.value))}
+              />
+            </>
+          )}
+        </div>
+        <div className="timelapse-control" role="group" aria-label="Imagery Timelapse">
+          <label htmlFor="timelapse-toggle">
             <input
-              aria-label="Imagery year"
-              type="range"
-              min={TIMELAPSE_START_YEAR}
-              max={TIMELAPSE_END_YEAR}
-              step={1}
-              value={timelapseYear}
+              id="timelapse-toggle"
+              type="checkbox"
+              checked={timelapseEnabled}
               onChange={(event) => {
-                setTimelapsePlaying(false);
-                setTimelapseYear(Number(event.target.value));
+                setTimelapseEnabled(event.target.checked);
+                if (!event.target.checked) {
+                  setTimelapsePlaying(false);
+                }
               }}
-            />
-            <span className="timelapse-year">
-              {timelapseYear}
-              {shownImageryYear !== timelapseYear && (
-                <span className="timelapse-fallback"> (showing {shownImageryYear})</span>
-              )}
-            </span>
-          </>
-        )}
+            />{" "}
+            Imagery Timelapse
+          </label>
+          {timelapseEnabled && (
+            <>
+              <button
+                type="button"
+                className="timelapse-play"
+                aria-label={timelapsePlaying ? "Pause timelapse" : "Play timelapse"}
+                onClick={() => setTimelapsePlaying((current) => !current)}
+              >
+                {timelapsePlaying ? "Pause" : "Play"}
+              </button>
+              <input
+                aria-label="Imagery year"
+                type="range"
+                min={TIMELAPSE_START_YEAR}
+                max={TIMELAPSE_END_YEAR}
+                step={1}
+                value={timelapseYear}
+                onChange={(event) => {
+                  setTimelapsePlaying(false);
+                  setTimelapseYear(Number(event.target.value));
+                }}
+              />
+              <span className="timelapse-year">
+                {timelapseYear}
+                {shownImageryYear !== timelapseYear && (
+                  <span className="timelapse-fallback"> (showing {shownImageryYear})</span>
+                )}
+              </span>
+            </>
+          )}
+        </div>
       </div>
       <div
         className="map-note"

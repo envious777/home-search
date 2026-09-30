@@ -159,6 +159,9 @@ h1 {
   height: 100%;
   width: 100%;
 }
+.map-canvas.scene-canvas {
+  touch-action: none;
+}
 /* Shadows wash out over bright aerial imagery; the SDK has no shadow-intensity knob, so darken the render itself.
    Only the WebGL canvas is filtered so the map widgets stay at full brightness. */
 .map-canvas.shadow-boost canvas {
@@ -217,10 +220,21 @@ h1 {
   background: var(--accent);
   color: var(--on-accent);
 }
-.sun-control {
+.map-controls {
   position: absolute;
+  z-index: 2;
   bottom: 12px;
   right: 12px;
+  display: flex;
+  flex-direction: column-reverse;
+  align-items: flex-end;
+  gap: 8px;
+  width: max-content;
+  max-width: calc(100% - 24px);
+}
+.sun-control,
+.timelapse-control {
+  position: static;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -253,21 +267,8 @@ h1 {
   background: var(--overlay);
   border: 1px solid var(--border);
 }
-.timelapse-control {
-  position: absolute;
-  bottom: 56px;
-  right: 12px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 7px 10px;
-  background: var(--overlay);
-  border: 1px solid var(--border);
-  box-shadow: 0 4px 12px var(--shadow);
-  font-size: 11px;
-  color: var(--muted);
-}
 .timelapse-control label {
+  grid-column: 1 / -1;
   display: flex;
   align-items: center;
   gap: 5px;
@@ -276,7 +277,12 @@ h1 {
   cursor: pointer;
 }
 .timelapse-control input[type="range"] {
-  width: 160px;
+  width: 100%;
+}
+.timelapse-control {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  width: 240px;
 }
 .timelapse-play {
   border: 0;
@@ -288,6 +294,8 @@ h1 {
   padding: 4px 8px;
 }
 .timelapse-year {
+  grid-column: 1 / -1;
+  justify-self: end;
   font-weight: 600;
   color: var(--fg);
   white-space: nowrap;
@@ -948,6 +956,9 @@ h1 {
   .legend {
     display: none;
   }
+  .save-button {
+    margin-bottom: 12px !important;
+  }
 }
 @media (max-width: 520px) {
   .brand span,
@@ -956,5 +967,35 @@ h1 {
   }
   h1 {
     font-size: 26px;
+  }
+  .basemap-switcher {
+    top: 56px;
+    right: 12px;
+    left: auto;
+  }
+  .map-controls {
+    width: calc(100% - 24px);
+    align-items: stretch;
+  }
+  .sun-control,
+  .timelapse-control {
+    width: 100%;
+  }
+  .sun-control {
+    display: grid;
+    grid-template-columns: auto auto minmax(76px, 1fr);
+  }
+  .sun-control label,
+  .timelapse-control label {
+    grid-column: 1 / -1;
+  }
+  .sun-control input[type="range"],
+  .timelapse-control input[type="range"] {
+    width: 100%;
+    min-width: 0;
+  }
+  .timelapse-control {
+    width: 100%;
+    grid-template-columns: auto minmax(0, 1fr);
   }
 }
