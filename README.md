@@ -61,15 +61,14 @@ Open the Vite URL shown in the terminal, normally `http://127.0.0.1:5173/`. Vite
 
 The frontend includes a local override in [frontend/.env.local](frontend/.env.local) with `VITE_API_BASE_URL=/api`, which matches the Vite proxy for same-origin local development. For static deployments or a different hosting setup, set `VITE_API_BASE_URL` to the deployed Functions URL ending in `/api` before building.
 
-The API's local defaults are in [api/local.settings.json](api/local.settings.json). `TAX_YEAR` controls the treasurer tax-district request and defaults to `2025` when the setting is absent:
+The API's local defaults are in [api/local.settings.json](api/local.settings.json). The treasurer tax-district request always uses the previous calendar year (for example, `2025` in 2026).
 
 ```json
 {
   "Values": {
     "FUNCTIONS_WORKER_RUNTIME": "node",
     "AzureWebJobsStorage": "UseDevelopmentStorage=true",
-    "STORAGE_CONNECTION_STRING": "UseDevelopmentStorage=true",
-    "TAX_YEAR": "2025"
+    "STORAGE_CONNECTION_STRING": "UseDevelopmentStorage=true"
   }
 }
 ```
@@ -181,7 +180,7 @@ The frontend calls the Azure Functions endpoint:
 | `502`  | Property search unavailable, or no account found for the address |
 | `504`  | Aggregation threw unexpectedly                                   |
 
-The treasurer tax-district section is requested for the year in the `TAX_YEAR` app setting (default `2025`).
+The treasurer tax-district section is requested for the previous calendar year.
 
 Example:
 

@@ -3,7 +3,6 @@
   "Values": {
     "FUNCTIONS_WORKER_RUNTIME": "node",
     "AzureWebJobsStorage": "UseDevelopmentStorage=true",
-    "STORAGE_CONNECTION_STRING": "UseDevelopmentStorage=true",
-    "TAX_YEAR": "2025"
+    "STORAGE_CONNECTION_STRING": "UseDevelopmentStorage=true"
   }
 }

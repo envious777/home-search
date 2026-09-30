@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { readBBoxQuery } from "../http/validation.js";
 import { propertyUrl, sectionUrl } from "./endpoints.js";
+
 describe("assessor endpoint construction", () => {
   it("encodes selected address fields server-side", () =>
     expect(

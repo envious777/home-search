@@ -32,10 +32,8 @@ const findAccount = (payload: unknown): string | null => {
   return typeof candidate === "string" && candidate.length > 0 ? candidate : null;
 }
 
-export const analyzeAddress = async (
-  address: AddressQuery,
-  year = process.env.TAX_YEAR ?? "2025",
-): Promise<{ status: number; body: AssessorResponse }> => {
+export const analyzeAddress = async (address: AddressQuery): Promise<{ status: number; body: AssessorResponse }> => {
+  const year = String(new Date().getFullYear() - 1);
   let property: unknown;
   try {
     property = await fetchJson(propertyUrl(address));
